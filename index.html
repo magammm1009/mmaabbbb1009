@@ -539,28 +539,20 @@
     .fineprint{font-size:12px; color:rgba(255,255,255,.62)}
     .sep{height:1px; background:rgba(255,255,255,.10)}
   
-/* PATCHED20_SAFE: visuals only (no rule changes) */
-.tile .name{ font-size: 12px !important; }
-.tokenLayer{ position:absolute; inset:0; pointer-events:none; }
-.token{
-  position:absolute;
-  transform: translate(-9999px,-9999px);
-  padding:6px 10px;
-  border-radius:999px;
-  font-weight:700;
-  font-size:13px;
-  background: rgba(255,255,255,0.10);
-  border: 1px solid rgba(255,255,255,0.18);
-  backdrop-filter: blur(8px);
-  box-shadow: 0 10px 26px rgba(0,0,0,0.22);
-  white-space:nowrap;
-  transition: transform 0.18s linear;
-}
-.token.me{
-  transform: translate(-9999px,-9999px) scale(1.08);
-  border-color: rgba(255, 105, 180, 0.75);
-  box-shadow: 0 0 0 2px rgba(255, 105, 180, 0.20), 0 16px 36px rgba(0,0,0,0.28);
-}
+    .diceWrap{display:flex;gap:10px;justify-content:center;align-items:center}
+    .diceWrap .dice{width:72px;height:72px;font-size:42px}
+    .btn.sparkle{position:relative;overflow:hidden}
+    .btn.sparkle::after{
+      content:"";position:absolute;inset:-40%;
+      background:radial-gradient(circle at 30% 30%, rgba(255,255,255,.55), rgba(255,255,255,0) 55%),
+                 radial-gradient(circle at 70% 70%, rgba(255,255,255,.35), rgba(255,255,255,0) 50%);
+      transform:translateX(-30%) rotate(12deg);
+      animation:sparkleSweep 1.3s linear infinite;
+      pointer-events:none;opacity:.85;mix-blend-mode:screen;
+    }
+    @keyframes sparkleSweep{0%{transform:translateX(-60%) rotate(12deg);opacity:.25}35%{opacity:.9}100%{transform:translateX(60%) rotate(12deg);opacity:.25}}
+    .tile.activeChoice{box-shadow:0 0 0 2px rgba(255,124,200,.35), 0 10px 30px rgba(255,124,200,.22);animation:tilePulse 1.2s ease-in-out infinite}
+    @keyframes tilePulse{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
 
 </style>
 
@@ -610,13 +602,13 @@
       <div class="boardWrap" id="gamePanel" style="display:none;">
 
         <div class="board">
-          <div class="boardGrid" id="boardGrid"><div class="tokenLayer" id="tokenLayer"></div>
+          <div class="boardGrid" id="boardGrid">
             <div class="center">
               <div class="centerTop">
                 <div class="round" id="roundView">라운드 0 / 10</div>
                 <span class="tag" id="turnTag">—</span>
               </div>
-              <div class="dice" id="dice">🎲</div>
+              <div class="diceWrap"><div class="dice" id="dice">🎲</div><div class="dice" id="dice2">🎲</div></div>
               <div class="row" style="margin-top:12px; justify-content:center;">
                 <button class="btn primary" id="btnOrderRoll">시작 굴림</button>
                 <button class="btn good" id="btnRoll">굴리기</button>
@@ -1358,7 +1350,7 @@ function applyActionAsHost_(key, a){
   /* ===============================
      Game data
   =============================== */
-  const ROUNDS_MAX = 30;
+  const ROUNDS_MAX = 10;
   const START_LETTERS = 15000;
 
   const TileType = {
@@ -1638,26 +1630,43 @@ function applyActionAsHost_(key, a){
 
   function diceRoll(){ return rand(1,6); }
 
-  function animateDice(finalN, cb){
-    const d = $("dice");
-    d.classList.add("rolling");
-    d.classList.add("pop");
-    let ticks = 0;
+  function diceRoll2(){
+    const d1 = rand(1,6);
+    const d2 = rand(1,6);
+    return {d1,d2,sum:d1+d2,dbl:d1===d2};
+  }
+
+
+  function animateDicePair(d1, d2, cb){
+    const dA = $("dice");
+    const dB = $("dice2") || null;
     const faces = ["⚀","⚁","⚂","⚃","⚄","⚅"];
+    const setFace = (el, n)=>{ if(!el) return; el.textContent = faces[Math.max(0, Math.min(5, (n||1)-1))]; };
+    const kick = (el)=>{ if(!el) return; el.classList.add("rolling"); el.classList.add("pop"); };
+
+    kick(dA); kick(dB);
+    let ticks = 0;
     const interval = setInterval(()=>{
-      d.textContent = faces[rand(0,5)];
+      setFace(dA, rand(1,6));
+      setFace(dB, rand(1,6));
       ticks++;
       if(ticks>=14){
         clearInterval(interval);
-        d.classList.remove("rolling");
-        d.textContent = faces[Math.max(0, Math.min(5, (finalN||1)-1))];
-        // micro-pop finish
-        d.classList.add("finish");
-        setTimeout(()=>d.classList.remove("finish"), 220);
+        dA.classList.remove("rolling");
+        if(dB) dB.classList.remove("rolling");
+        setFace(dA, d1);
+        setFace(dB, d2);
+        dA.classList.add("finish");
+        if(dB) dB.classList.add("finish");
+        setTimeout(()=>{ dA.classList.remove("finish"); if(dB) dB.classList.remove("finish"); }, 220);
         cb?.();
       }
     }, 45);
-    setTimeout(()=>d.classList.remove("pop"), 260);
+  }
+
+  function animateDice(finalN, cb){
+    const n = Math.max(1, Math.min(6, (finalN||1)));
+    animateDicePair(n, rand(1,6), cb);
   }
 
   async function moveSteps(pid, steps){
@@ -1837,10 +1846,12 @@ function applyActionAsHost_(key, a){
     }
 
     beepCute("dice");
-    const n = diceRoll();
+    const r = diceRoll2();
+    const n = r.sum;
+    state.lastDice = {d1:r.d1, d2:r.d2, sum:r.sum, dbl:r.dbl};
     state.lastRoll = n;
     $("lastRoll").textContent = n;
-    animateDice(n, ()=>{});
+    animateDicePair(r.d1, r.d2, ()=>{});
 
     if(isOrderRoll){
       p.orderRoll = n;
@@ -2101,6 +2112,9 @@ function applyActionAsHost_(key, a){
 
     $("btnBuy").disabled = !(isMy && pend.canBuy);
     $("btnUpgrade").disabled = !(isMy && pend.canUpgrade);
+    $("btnBuy").classList.toggle("sparkle", !!(isMy && pend.canBuy));
+    $("btnUpgrade").classList.toggle("sparkle", !!(isMy && pend.canUpgrade));
+    try{document.querySelectorAll(".tile.activeChoice").forEach(el=>el.classList.remove("activeChoice")); if(isMy && (pend.canBuy||pend.canUpgrade) && state.pending?.landedTileId){ const tEl=document.querySelector(`.tile[data-id="${state.pending.landedTileId}"]`); if(tEl) tEl.classList.add("activeChoice");}}catch(e){}
     $("btnLoan").disabled = !(isMy && pend.canLoan);
     $("btnRepay").disabled = !(isMy && pend.canRepay);
   }
@@ -2236,93 +2250,7 @@ function applyActionAsHost_(key, a){
     return { emoji, label, sub:"" };
   }
 
-  
-  // ===============================
-  // PATCHED20_SAFE: token layer + step movement (client-side animation)
-  // ===============================
-  const tokenAnim = { prevPos: {}, timers: {} };
-
-  function tileCenterForPos(pos){
-    const el = document.querySelector(`.tile.pos-${pos}`);
-    const grid = $("boardGrid");
-    if(!el || !grid) return null;
-    const r = el.getBoundingClientRect();
-    const gr = grid.getBoundingClientRect();
-    const cx = (r.left + r.right)/2 - gr.left;
-    const cy = (r.top + r.bottom)/2 - gr.top;
-    // pull towards inner track (vector to center) to make an "inner path"
-    const gcx = (gr.width)/2;
-    const gcy = (gr.height)/2;
-    const vx = (gcx - cx);
-    const vy = (gcy - cy);
-    const k = 0.22;
-    return { x: cx + vx*k, y: cy + vy*k };
-  }
-
-  function ensureToken(uid, isMe){
-    const layer = $("tokenLayer");
-    if(!layer) return null;
-    let t = layer.querySelector(`.token[data-uid="${uid}"]`);
-    if(!t){
-      t = document.createElement("div");
-      t.className = "token";
-      t.setAttribute("data-uid", uid);
-      layer.appendChild(t);
-    }
-    if(isMe) t.classList.add("me"); else t.classList.remove("me");
-    return t;
-  }
-
-  function animateTokenSteps(uid, fromPos, toPos){
-    const p = (state.players||{})[uid];
-    if(!p) return;
-    const N = state.tiles?.length || 1;
-    const steps = (toPos - fromPos + N) % N;
-
-    // short step animation only; otherwise teleport (prevents crazy loops)
-    if(steps===0 || steps>12){
-      const c = tileCenterForPos(toPos);
-      const t = ensureToken(uid, uid===local.meId);
-      if(c && t) t.style.transform = `translate(${c.x}px, ${c.y}px)`;
-      tokenAnim.prevPos[uid] = toPos;
-      return;
-    }
-
-    if(tokenAnim.timers[uid]){
-      tokenAnim.timers[uid].forEach(id=>clearTimeout(id));
-      tokenAnim.timers[uid]=null;
-    }
-    const tids=[];
-    for(let i=1;i<=steps;i++){
-      const pos=(fromPos+i)%N;
-      tids.push(setTimeout(()=>{
-        const c=tileCenterForPos(pos);
-        const t=ensureToken(uid, uid===local.meId);
-        if(c && t) t.style.transform = `translate(${c.x}px, ${c.y}px)`;
-        if(i===steps) tokenAnim.prevPos[uid]=toPos;
-      }, i*220));
-    }
-    tokenAnim.timers[uid]=tids;
-  }
-
-  function updateTokenLayer(){
-    const players = state.players || {};
-    for(const [uid,p] of Object.entries(players)){
-      if(!p || p.bankrupt) continue;
-      const t = ensureToken(uid, uid===local.meId);
-      if(!t) continue;
-      t.textContent = (p.avatar||"🙂") + " " + p.name;
-      const prev = (tokenAnim.prevPos[uid]===undefined) ? p.pos : tokenAnim.prevPos[uid];
-      if(prev !== p.pos){
-        animateTokenSteps(uid, prev, p.pos);
-      }else{
-        const c=tileCenterForPos(p.pos);
-        if(c) t.style.transform = `translate(${c.x}px, ${c.y}px)`;
-      }
-    }
-  }
-
-function renderBoard(){
+  function renderBoard(){
     const grid = $("boardGrid");
     if(!renderBoard._done){
       for(const t of state.tiles){
@@ -2427,8 +2355,7 @@ function renderBoardTokens(){
       if(!p) continue;
       prev[p.id] = p.pos;
     }
-      try{ updateTokenLayer(); }catch(e){}
-}
+  }
 
   function renderAll(){
     $("roomIdView").textContent = state?.roomId || "—";
