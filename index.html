@@ -720,6 +720,14 @@
           </div>
         </div>
 
+        <div class="fineprint">
+   
+       
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 
   <div class="modalBack" id="modalBack">
@@ -745,6 +753,9 @@ const AUTO_ROOM_ID = (qp.get('sid')||qp.get('roomId')||qp.get('room')||'SUDABANG
 const AUTO_NAME = (qp.get('u')||qp.get('name')||'').trim();
 const RETURN_URL = (qp.get('returnUrl')||qp.get('return')||'').trim();
 const GAME_SESSION = (qp.get('gs')||qp.get('game')||'').trim();
+
+// ✅ base room (수다방 방 코드) — 모든 참가자가 공유하는 "로비 키"
+const BASE_ROOM = (AUTO_ROOM_ID || "SUDABANG").trim().toUpperCase() || "SUDABANG";
 
 // opener(수다방)에게 알리기 (같은 출처가 아니어도 postMessage는 됨)
 function notifyOpener_(type, data){
@@ -1886,8 +1897,30 @@ function applyActionAsHost_(key, a){
 
   function endGame(winnerId, reason){
     setPhase("GAME_OVER");
+
+    // ✅ 세션 종료 처리: 다음에 열면 "새 게임"이 생성되도록 로비 activeSession을 비움 (호스트만)
+    try{
+      if(local && local.mode==="FB" && NET && NET.isHost && NET.db){
+        NET.db.ref("games/marble/" + BASE_ROOM + "/meta").update({
+          activeSession: null,
+          lastEndedAt: Date.now(),
+        });
+      }
+    }catch(e){}
     const w = state.players[winnerId];
     pushLog(`🏆 게임 종료! 승자: ${w.name} ${w.emoji} (${reason})`);
+
+    // ✅ 채팅에도 시스템 메시지로 승자 알림(호스트가 1회만)
+    try{
+      if(local && local.mode==="FB" && NET && NET.isHost && NET.chatRef){
+        NET.chatRef.push({
+          tsMs: Date.now(),
+          name: "SYSTEM",
+          text: `🏆 게임 종료! 승자: ${w.name} ${w.emoji} (${reason})`,
+          sys: true,
+        });
+      }
+    }catch(e){}
     setBanner(`🏆 <b>${w.name}</b> ${w.emoji} 우승! <span class="mono">(${reason})</span>`);
     showModal({
       title:"🏆 게임 종료!",
@@ -2609,14 +2642,94 @@ function renderBoardTokens(){
   /* ===============================
      UI wiring
   =============================== */
-  function ensureRoomId(){
-    // 수다방에서 넘어온 sid/room을 기본 방 코드로 사용
-    const base = (AUTO_ROOM_ID || "SUDABANG").trim() || "SUDABANG";
-    // ✅ gs(게임세션)가 있으면 방 키에 포함해서 '항상 새 판'을 보장
-    const gs = (GAME_SESSION||"").trim();
-        const rid = gs ? (base + "__" + gs) : base; // ✅ gs 포함: 항상 새 게임 세션
-    return rid.toUpperCase();
+  // ---- Room/session resolver ----
+// 문제 원인: 각 사람이 "gs"를 따로 만들면 서로 다른 roomId로 접속해서 '나만 보임'이 발생함.
+// 해결: BASE_ROOM 로비에 activeSession을 저장하고, gs가 없으면 모두 그 세션으로 붙게 함.
+function genSessionId_(){
+  // short, url-safe
+  return Math.random().toString(36).slice(2, 7).toUpperCase() + Math.random().toString(36).slice(2, 6).toUpperCase();
+}
+async function netBootstrap_(){
+  // firebase init + anon auth only (no room binding)
+  try{
+    if(!firebase.apps || !firebase.apps.length) firebase.initializeApp(firebaseConfig);
+  }catch(e){ try{ firebase.initializeApp(firebaseConfig); }catch(_){} }
+  try{
+    if(!NET.db) NET.db = firebase.database();
+  }catch(e){
+    NET.db = firebase.database();
   }
+  try{
+    if(!firebase.auth().currentUser){
+      await firebase.auth().signInAnonymously();
+    }
+    NET.uid = firebase.auth().currentUser && firebase.auth().currentUser.uid;
+  }catch(e){
+    console.warn("anon auth failed", e);
+  }
+}
+async function resolveRoomId_(){
+  // ✅ 목표: "먼저 열린 방"으로 모두가 합류하도록, 개인별 gs는 무시하고
+  // 로비(BASE_ROOM)의 activeSession을 우선 사용한다.
+  // 단, activeSession이 아직 없을 때만 URL의 gs를 "초기 세션"으로 채택한다.
+
+  await netBootstrap_();
+
+  const lobbyMeta = NET.db.ref("games/marble/" + BASE_ROOM + "/meta");
+
+  // 1) 로비의 activeSession 읽기
+  let active = "";
+  try{
+    const snap = await lobbyMeta.child("activeSession").once("value");
+    active = (snap.val()||"").toString().trim();
+  }catch(e){}
+
+  const explicitGs = (GAME_SESSION||"").trim();
+
+  // 2) activeSession이 없으면: URL gs가 있으면 그걸 채택(첫 오픈), 없으면 생성
+  if(!active){
+    active = explicitGs || genSessionId_();
+    try{
+      await lobbyMeta.update({ activeSession: active, activeAt: Date.now() });
+    }catch(e){}
+  }else{
+    // 3) activeSession이 이미 있으면: URL gs가 달라도 activeSession으로 강제 합류
+    // (방이 둘로 갈라지는 문제 해결)
+    if(explicitGs && explicitGs !== active){
+      // URL을 '현재 activeSession'으로 정규화(보기/공유용). 기능에는 영향 없음.
+      try{
+        const u = new URL(location.href);
+        u.searchParams.set("gs", active);
+        history.replaceState(null, "", u.toString());
+      }catch(e){}
+    }
+  }
+
+  // 4) active가 GAME_OVER면 새로 생성(단, 방 분열 방지를 위해 transaction으로)
+  try{
+    const phSnap = await NET.db.ref("games/marble/" + (BASE_ROOM + "__" + active).toUpperCase() + "/state/phase").once("value");
+    const ph = (phSnap.val()||"WAITING").toString().toUpperCase();
+    if(ph==="GAME_OVER" || ph==="OVER"){
+      // 새 세션 만들고 교체
+      const fresh = genSessionId_();
+      try{ await lobbyMeta.update({ activeSession: fresh, activeAt: Date.now(), lastEndedAt: Date.now() }); }catch(e){}
+      active = fresh;
+      try{
+        const u = new URL(location.href);
+        u.searchParams.set("gs", active);
+        history.replaceState(null, "", u.toString());
+      }catch(e){}
+    }
+  }catch(e){}
+
+  return (BASE_ROOM + "__" + active).toUpperCase();
+}
+
+// (동기 버전 필요할 때: 화면 표시용)
+function ensureRoomIdSync_(){
+  const explicitGs = (GAME_SESSION||"").trim();
+  return (explicitGs ? (BASE_ROOM + "__" + explicitGs) : BASE_ROOM).toUpperCase();
+}
   function ensureName(){
 
     const name = ($("inpName").value || "").trim();
@@ -2628,7 +2741,7 @@ function renderBoardTokens(){
   $("btnJoin").onclick = async () => {
   beepCute("click");
   local.role = "PLAYER";
-  const rid = ensureRoomId();
+  const rid = await resolveRoomId_();
   const name = ensureName();
   if(!name || name==="익명"){ toast("닉네임을 입력해줘! (익명 말고!)"); return; }
   try{ localStorage.setItem("bb_last_name", name); }catch(e){}
@@ -2672,7 +2785,7 @@ $("btnSpectate").onclick = async () => {
   try{ localStorage.setItem("bb_last_name", name); }catch(e){}
   local.chatName = name;
   local.entered = true;
-  const rid = ensureRoomId();
+  const rid = await resolveRoomId_();
   await netInit_(rid);
   if(!NET.enabled){ toast("멀티 연결 실패…"); return; }
 
@@ -2693,7 +2806,7 @@ if($("chatInp")) $("chatInp").addEventListener("keydown", (e)=>{ if(e.key==="Ent
 
 // auto connect to the same room immediately (so spectators can chat too)
 (async () => {
-  const rid = ensureRoomId();
+  const rid = await resolveRoomId_();
   try{
     $("roomIdView").textContent = rid;
     $("chatRoomView").textContent = rid;
