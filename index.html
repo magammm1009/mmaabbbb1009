@@ -161,21 +161,7 @@
       position:relative;
       overflow:hidden;
     }
-    .board::after{
-      content:"";
-      position:absolute;
-      inset:60px;
-      border-radius: 18px;
-      border: 1px dashed rgba(255,255,255,.14);
-      box-shadow: inset 0 0 0 1px rgba(0,0,0,.25);
-      background:
-        radial-gradient(420px 220px at 18% 20%, rgba(255,255,255,.06), transparent 65%),
-        radial-gradient(420px 220px at 82% 82%, rgba(255,255,255,.04), transparent 65%);
-      pointer-events:none;
-      z-index:5;
-      opacity:.9;
-    }
-
+    .board::after{display:none;}
 
     .boardGrid{
       position:absolute; inset:0;
@@ -189,7 +175,7 @@
       grid-column: 2 / span 5;
       grid-row: 2 / span 5;
       border-radius: 18px;
-      border:1px dashed rgba(255,255,255,.18);
+      border:1px solid rgba(255,255,255,.14);
       background: radial-gradient(400px 220px at 50% 40%, rgba(255,124,200,.14), transparent 70%),
                   radial-gradient(420px 240px at 50% 60%, rgba(124,255,178,.10), transparent 72%),
                   rgba(0,0,0,.18);
@@ -465,7 +451,7 @@
       font-size:12px;
       line-height:1.45;
       color:rgba(255,255,255,.86);
-      max-height: 220px;
+      max-height: 360px;
       overflow:auto;
       padding-right:6px;
       display:grid;
@@ -653,6 +639,18 @@
             <!-- tiles injected -->
           </div>
         </div>
+
+      <div class="grid" id="leftLogPanel" style="padding-top:0;">
+        <div class="section">
+                  <div class="hdr">
+                    <span>로그</span>
+                    <span class="pill">LAST <span class="mono" id="lastRoll">—</span></span>
+                  </div>
+                  <div class="body">
+                    <div class="log" id="log"></div>
+                  </div>
+                </div>
+      </div>
       </div>
     </div>
 
@@ -686,17 +684,8 @@
           </div>
         </div>
 
-        <div class="section">
-          <div class="hdr">
-            <span>로그</span>
-            <span class="pill">LAST <span class="mono" id="lastRoll">—</span></span>
-          </div>
-          <div class="body">
-            <div class="log" id="log"></div>
-          </div>
-        </div>
-
         
+
         <div class="section">
           <div class="hdr">
             <span>채팅</span>
@@ -722,8 +711,8 @@
         </div>
 
         <div class="fineprint">
-    
-        
+          💡 팁: 버튼이 안 죽게 하려면 “턴 상태(phase)”를 엄격히 나눠야 해요.<br/>
+          이 파일은 멀티 연동 전에도 재미있게 굴러가도록 <b>로컬 MVP</b>로 만든 버전입니다.
         </div>
       </div>
     </div>
