@@ -161,6 +161,21 @@
       position:relative;
       overflow:hidden;
     }
+    .board::after{
+      content:"";
+      position:absolute;
+      inset:60px;
+      border-radius: 18px;
+      border: 1px dashed rgba(255,255,255,.14);
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,.25);
+      background:
+        radial-gradient(420px 220px at 18% 20%, rgba(255,255,255,.06), transparent 65%),
+        radial-gradient(420px 220px at 82% 82%, rgba(255,255,255,.04), transparent 65%);
+      pointer-events:none;
+      z-index:5;
+      opacity:.9;
+    }
+
 
     .boardGrid{
       position:absolute; inset:0;
@@ -270,7 +285,7 @@
       filter: drop-shadow(0 2px 5px rgba(0,0,0,.28));
     }
     .tile .name .tLabel{
-      font-size:17px;
+      font-size:16px;
       line-height:1.18;
       display:-webkit-box;
       -webkit-box-orient:vertical;
@@ -312,29 +327,38 @@
       background: transparent;
       display:none;
     }
-    .tile .tokens{
-      position:absolute; left:6px; bottom:14px;
-      display:flex;
-      gap:0;
+    .tile 
+    /* Tokens (overlay layer for smooth movement) */
+    .tokenLayer{
+      position:absolute; inset:0;
       pointer-events:none;
+      z-index:30;
     }
+    /* Keep tile token holder, but we no longer render tokens inside tiles */
+    .tokens{ display:none; }
+
     .token{
-      width:26px; height:26px;
+      position:absolute;
+      left:0; top:0;
+      width:28px; height:28px;
       display:flex; align-items:center; justify-content:center;
       font-size:18px;
-      filter: drop-shadow(0 2px 5px rgba(0,0,0,.35));
-      transform: translateX(var(--dx, 0px)) translateY(var(--dy, 0px));
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,.40));
+      transform: translate(var(--x, 0px), var(--y, 0px)) translate(-50%, -50%) scale(var(--s, 1));
+      transition: transform 220ms cubic-bezier(.2,.8,.2,1);
+      will-change: transform;
     }
-
     .token.me{
-      filter: drop-shadow(0 3px 10px rgba(255,124,200,.55)) drop-shadow(0 0 14px rgba(255,124,200,.35));
-      transform: translateX(var(--dx, 0px)) translateY(var(--dy, 0px)) scale(1.18);
+      --s: 1.22;
+      filter:
+        drop-shadow(0 4px 14px rgba(255,124,200,.70))
+        drop-shadow(0 0 18px rgba(255,124,200,.35));
     }
-    .token.moved{
-      animation: tokenPop .28s ease-out 1;
-    }
+    .token.moved{ animation: tokenPop .28s ease-out 1; }
     @keyframes tokenPop{
-      0%{transform: translateX(var(--dx, 0px)) translateY(var(--dy, 0px)) scale(0.92)}
+      0%{ transform: translate(var(--x,0px), var(--y,0px)) translate(-50%,-50%) scale(calc(var(--s,1) * .86)); }
+      100%{ transform: translate(var(--x,0px), var(--y,0px)) translate(-50%,-50%) scale(var(--s,1)); }
+    }
       60%{transform: translateX(var(--dx, 0px)) translateY(var(--dy, 0px)) scale(1.26)}
       100%{transform: translateX(var(--dx, 0px)) translateY(var(--dy, 0px)) scale(1.12)}
     }
@@ -603,9 +627,10 @@
 
         <div class="board">
           <div class="boardGrid" id="boardGrid">
+            <div class="tokenLayer" id="tokenLayer"></div>
             <div class="center">
               <div class="centerTop">
-                <div class="round" id="roundView">라운드 0 / 10</div>
+                <div class="round" id="roundView">라운드 0 / 30</div>
                 <span class="tag" id="turnTag">—</span>
               </div>
               <div class="diceWrap"><div class="dice" id="dice">🎲</div><div class="dice" id="dice2">🎲</div></div>
@@ -1065,6 +1090,7 @@ function applyActionAsHost_(key, a){
     }
 
     function rollDeterministic_(){ return rand(1,6); }
+    function rollPairDeterministic_(){ return { d1: rand(1,6), d2: rand(1,6) }; }
 
     function moveImmediate_(p, steps){
       const n = state.tiles.length;
@@ -1086,7 +1112,7 @@ function applyActionAsHost_(key, a){
           const alive = Object.values(state.players||{}).filter(p=>p && !p.bankrupt);
           if(alive.length){
             alive.sort((a,b)=>(b.letters-a.letters) || ((b.owned?.length||0)-(a.owned?.length||0)));
-            state.gameOver = { winnerId: alive[0].id, reason: "10라운드 종료", at: Date.now() };
+            state.gameOver = { winnerId: alive[0].id, reason: "30라운드 종료", at: Date.now() };
           }else{
             state.gameOver = { winnerId: null, reason: "종료", at: Date.now() };
           }
@@ -1120,12 +1146,26 @@ function applyActionAsHost_(key, a){
         hostAdvanceTurn_(true);
         return;
       }
+
+      // Jail (SLUMP) handling: you may attempt to roll a double to escape
+      if((p.jail||0) > 0){
+        state.pending = {
+          rolled:false, steps:0, landedTileId:null,
+          canBuy:false, canUpgrade:false,
+          canLoan:canLoan(p), canRepay:canRepay(p),
+          inJail:true, jailLeft:p.jail
+        };
+        return;
+      }
+
+      // Generic skip (kept for future effects)
       if(p.skip > 0){
         p.skip -= 1;
-        hostLog('😵 ' + p.name + ' 슬럼프… 이번 턴 쉬기 (남은 ' + p.skip + ')');
+        hostLog('😵 ' + p.name + ' 이번 턴 쉬기 (남은 ' + p.skip + ')');
         hostAdvanceTurn_(true);
         return;
       }
+
       state.pending = {
         rolled:false, steps:0, landedTileId:null,
         canBuy:false, canUpgrade:false,
@@ -1220,22 +1260,85 @@ function applyActionAsHost_(key, a){
         if(state.phase!=="PLAY") break;
         if(!isActorsTurn_()) break;
         if(state.pending?.rolled) break;
-        const p = state.players[actorUid];
-        const n = rollDeterministic_();
-        state.lastRoll = n;
-        state.pending.rolled = true;
-        state.pending.steps = n;
-        hostLog('🎲 ' + p.name + ' 굴림: ' + n);
 
-        moveImmediate_(p, n);
+        const p = state.players[actorUid];
+        const pair = rollPairDeterministic_();
+        const d1 = pair.d1, d2 = pair.d2;
+        const sum = d1 + d2;
+        const isDouble = (d1 === d2);
+
+        state.lastRoll = { d1, d2, sum, double: isDouble };
+        state.pending.rolled = true;
+
+        // SLUMP(감옥) 상태면: 더블 성공 시 즉시 탈출+이동, 실패 시 턴 소모(이동 없음)
+        if((p.jail||0) > 0){
+          if(isDouble){
+            p.jail = 0;
+            state.pending.inJail = false;
+            hostLog('🎲🎲 더블! ' + p.name + ' 슬럼프 탈출! +' + sum + '칸 이동');
+            state.pending.steps = sum;
+            state.pending.extraTurn = true; // 더블 규칙과 동일: 추가 턴
+            moveImmediate_(p, sum);
+            const tile = tileAt(p.pos);
+            state.pending.landedTileId = tile.id;
+            if(tile.type === TileType.START) applyStartLand(p);
+            resolveLanding(p, tile);
+
+            const needChoice = !!(state.pending && (state.pending.canBuy || state.pending.canUpgrade));
+            if(!needChoice){
+              if(state.pending.forceEndTurn){
+                state.pending.forceEndTurn = false;
+                hostAdvanceTurn_(true);
+              }else if(state.pending.extraTurn){
+                hostLog('✨ 더블 보너스! 한 번 더 굴려요');
+                state.pending = {
+                  rolled:false, steps:0, landedTileId:null,
+                  canBuy:false, canUpgrade:false,
+                  canLoan:canLoan(p), canRepay:canRepay(p),
+                  inJail:false
+                };
+              }else{
+                hostAdvanceTurn_(true);
+              }
+            }
+          }else{
+            p.jail = Math.max(0, (p.jail||0) - 1);
+            hostLog('😵 ' + p.name + ' 슬럼프… 더블 실패! 이번 턴은 이동 없음 (남은 ' + p.jail + '턴)');
+            if(p.jail === 0){
+              hostLog('✅ ' + p.name + ' 슬럼프 자동 해제!');
+            }
+            hostAdvanceTurn_(true);
+          }
+          break;
+        }
+
+        // 일반 턴
+        state.pending.steps = sum;
+        state.pending.extraTurn = isDouble;
+        hostLog('🎲 ' + p.name + ' 굴림: ' + d1 + '+' + d2 + '=' + sum + (isDouble ? ' (더블!)' : ''));
+
+        moveImmediate_(p, sum);
         const tile = tileAt(p.pos);
         state.pending.landedTileId = tile.id;
         if(tile.type === TileType.START) applyStartLand(p);
         resolveLanding(p, tile);
-        // auto-advance if no property decision (buy/upgrade)
+
         const needChoice = !!(state.pending && (state.pending.canBuy || state.pending.canUpgrade));
         if(!needChoice){
-          hostAdvanceTurn_(true);
+          if(state.pending.forceEndTurn){
+            state.pending.forceEndTurn = false;
+            hostAdvanceTurn_(true);
+          }else if(state.pending.extraTurn){
+            hostLog('✨ 더블! 한 번 더 굴려요');
+            state.pending = {
+              rolled:false, steps:0, landedTileId:null,
+              canBuy:false, canUpgrade:false,
+              canLoan:canLoan(p), canRepay:canRepay(p),
+              inJail:false
+            };
+          }else{
+            hostAdvanceTurn_(true);
+          }
         }
         break;
       }
@@ -1243,15 +1346,37 @@ function applyActionAsHost_(key, a){
         if(!state.players || !state.players[actorUid]) break;
         if(!isActorsTurn_()) break;
         hostBuy_(actorUid);
-        // after tile action, auto-advance
-        hostAdvanceTurn_(true);
+        // after tile action, end turn unless we had a double extra turn
+        if(state.pending && state.pending.extraTurn){
+          const p = state.players[actorUid];
+          hostLog('✨ 더블 보너스! 한 번 더 굴려요');
+          state.pending = {
+            rolled:false, steps:0, landedTileId:null,
+            canBuy:false, canUpgrade:false,
+            canLoan:canLoan(p), canRepay:canRepay(p),
+            inJail:false
+          };
+        }else{
+          hostAdvanceTurn_(true);
+        }
         break;
       }
       case "UPGRADE": {
         if(!state.players || !state.players[actorUid]) break;
         if(!isActorsTurn_()) break;
         hostUpgrade_(actorUid);
-        hostAdvanceTurn_(true);
+        if(state.pending && state.pending.extraTurn){
+          const p = state.players[actorUid];
+          hostLog('✨ 더블 보너스! 한 번 더 굴려요');
+          state.pending = {
+            rolled:false, steps:0, landedTileId:null,
+            canBuy:false, canUpgrade:false,
+            canLoan:canLoan(p), canRepay:canRepay(p),
+            inJail:false
+          };
+        }else{
+          hostAdvanceTurn_(true);
+        }
         break;
       }
       case "LOAN": {
@@ -1350,7 +1475,7 @@ function applyActionAsHost_(key, a){
   /* ===============================
      Game data
   =============================== */
-  const ROUNDS_MAX = 10;
+  const ROUNDS_MAX = 30;
   const START_LETTERS = 15000;
 
   const TileType = {
@@ -1389,7 +1514,7 @@ function applyActionAsHost_(key, a){
     {id:6,  type:TileType.EVENT,    key:"INSP",   name:"영감 💡", desc:"+글자수 보너스!"},
 
     // left (6)
-    {id:7,  type:TileType.REST,     key:"SLUMP",  name:"슬럼프 😵", desc:"다음 턴 쉬기 (1회)"},
+    {id:7,  type:TileType.REST,     key:"SLUMP",  name:"슬럼프 😵", desc:"감옥: 더블로 탈출(최대 2턴)"},
     {id:8,  type:TileType.PROPERTY, tier:3, name:"작업실 투룸"},
     {id:9,  type:TileType.EVENT,    key:"LIB",    name:"도서관 📚", desc:"꾸준히 써짐 +800자"},
     {id:10, type:TileType.PROPERTY, tier:0, name:"골목 월세"},
@@ -1818,7 +1943,7 @@ function applyActionAsHost_(key, a){
         const alive = alivePlayers();
         if(alive.length === 1){ endGame(alive[0].id, "마지막 생존"); return; }
         alive.sort((a,b)=>b.letters-a.letters || b.owned.length-a.owned.length);
-        endGame(alive[0].id, "10라운드 글자수 1위");
+        endGame(alive[0].id, "30라운드 글자수 1위");
         return;
       }
     }
@@ -1908,9 +2033,13 @@ function applyActionAsHost_(key, a){
 
   function applyRest(p, tile){
     if(tile.key==="SLUMP"){
-      p.skip = Math.max(p.skip, 1);
-      pushLog(`😵 ${p.name} 슬럼프! 다음 턴 쉬기 1회`);
-      setBanner(`😵 슬럼프! 다음 턴 쉬기…`);
+      // Jail rule: arriving sends you to slump jail for up to 2 turns
+      p.jail = Math.max(p.jail||0, 2);
+      pushLog(`😵 ${p.name} 슬럼프(감옥)! 최대 2턴 갇힘 — 더블로 즉시 탈출 가능`);
+      setBanner(`😵 슬럼프! 더블로 탈출(최대 2턴)`);
+      // End the current turn immediately when you land here
+      state.pending = state.pending || {};
+      state.pending.forceEndTurn = true;
       return;
     }
     if(tile.key==="MOVE"){
@@ -2316,44 +2445,150 @@ function applyActionAsHost_(key, a){
 
   
 function renderBoardTokens(){
-    // Track position changes for a tiny "move pop" animation (visual only)
-    local._prevPos = local._prevPos || {};
-    const prev = local._prevPos;
+    // Overlay token layer (smooth step movement). Visual-only; game state remains authoritative.
+    const layer = $("tokenLayer");
+    if(!layer) return;
 
-    // Clear
-    document.querySelectorAll(".tile .tokens").forEach(x=>x.innerHTML="");
+    // lazy init anim state
+    local._tok = local._tok || { prevPos:{}, timers:{}, els:{} };
 
-    const posMap = new Map();
-    for(const p of Object.values(state.players||{})){
-      if(p.bankrupt) continue;
-      const arr = posMap.get(p.pos) || [];
+    const grid = $("boardGrid");
+    const gr = grid ? grid.getBoundingClientRect() : null;
+    if(!gr || gr.width<10) return;
+
+    const cx = gr.width/2, cy = gr.height/2;
+    const N = (state.tiles||[]).length || 0;
+    if(!N) return;
+
+    const tileCenterFor = (pos)=>{
+      const el = document.querySelector(`.tile[data-id="${pos}"]`);
+      if(!el) return {x:cx,y:cy};
+      const r = el.getBoundingClientRect();
+      // center in boardGrid coordinates
+      const x = (r.left - gr.left) + r.width/2;
+      const y = (r.top  - gr.top ) + r.height/2;
+
+      // pull toward inner track
+      const k = 0.22;
+      return { x: x + (cx - x)*k, y: y + (cy - y)*k };
+    };
+
+    const offsetForIndex = (idx)=>{
+      const ring = 10;
+      const ang = (idx * 2*Math.PI) / 6;
+      return { ox: Math.cos(ang)*ring, oy: Math.sin(ang)*ring };
+    };
+
+    const ensureEl = (uid, isMe, emoji)=>{
+      let el = local._tok.els[uid];
+      if(!el){
+        el = document.createElement("div");
+        el.className = "token" + (isMe ? " me" : "");
+        el.setAttribute("data-uid", uid);
+        layer.appendChild(el);
+        local._tok.els[uid] = el;
+      }
+      el.textContent = emoji || "🙂";
+      if(isMe) el.classList.add("me"); else el.classList.remove("me");
+      return el;
+    };
+
+    const cancelAnim = (uid)=>{
+      const arr = local._tok.timers[uid];
+      if(arr && arr.length){
+        arr.forEach(t=>clearTimeout(t));
+      }
+      local._tok.timers[uid] = [];
+    };
+
+    const animateSteps = (uid, fromPos, toPos, idx, isMe, emoji)=>{
+      if(fromPos === toPos){
+        const el = ensureEl(uid, isMe, emoji);
+        const c = tileCenterFor(toPos);
+        const off = offsetForIndex(idx);
+        el.style.setProperty("--x", (c.x + off.ox) + "px");
+        el.style.setProperty("--y", (c.y + off.oy) + "px");
+        return;
+      }
+      cancelAnim(uid);
+      const el = ensureEl(uid, isMe, emoji);
+
+      const steps = [];
+      let p = fromPos;
+      while(p !== toPos){
+        p = (p + 1) % N;
+        steps.push(p);
+        if(steps.length > N+2) break;
+      }
+
+      // Teleport fallback if path is too long (safety)
+      if(steps.length > 18){
+        const c = tileCenterFor(toPos);
+        const off = offsetForIndex(idx);
+        el.style.setProperty("--x", (c.x + off.ox) + "px");
+        el.style.setProperty("--y", (c.y + off.oy) + "px");
+        return;
+      }
+
+      const tids = [];
+      steps.forEach((stepPos, i)=>{
+        const tid = setTimeout(()=>{
+          const c = tileCenterFor(stepPos);
+          const off = offsetForIndex(idx);
+          el.classList.add("moved");
+          el.style.setProperty("--x", (c.x + off.ox) + "px");
+          el.style.setProperty("--y", (c.y + off.oy) + "px");
+          setTimeout(()=>el.classList.remove("moved"), 220);
+        }, i * 240);
+        tids.push(tid);
+      });
+      local._tok.timers[uid] = tids;
+    };
+
+    // Build occupancy map for stable offsets
+    const byPos = new Map();
+    const players = Object.values(state.players||{}).filter(p=>p && !p.bankrupt);
+    players.sort((a,b)=> (a.id||"").localeCompare(b.id||""));
+
+    for(const p of players){
+      const arr = byPos.get(p.pos) || [];
       arr.push(p);
-      posMap.set(p.pos, arr);
+      byPos.set(p.pos, arr);
     }
 
-    for(const [pos, arr] of posMap.entries()){
-      const holder = document.querySelector(`.tile[data-id="${pos}"] .tokens`);
-      if(!holder) continue;
-
+    // Render / animate
+    for(const [pos, arr] of byPos.entries()){
       arr.forEach((p, idx)=>{
-        const t = document.createElement("div");
-        const was = prev[p.id];
-        const moved = (was != null && was !== p.pos);
-        t.className = "token" + (p.id===local.meId ? " me" : "") + (moved ? " moved" : "");
-
-        const dx = (idx%3) * 12;
-        const dy = Math.floor(idx/3) * -10;
-        t.style.setProperty("--dx", dx+"px");
-        t.style.setProperty("--dy", dy+"px");
-        t.textContent = p.emoji;
-        holder.appendChild(t);
+        const isMe = (p.id===local.meId);
+        const prev = local._tok.prevPos[p.id];
+        if(prev == null){
+          const el = ensureEl(p.id, isMe, p.emoji);
+          const c = tileCenterFor(p.pos);
+          const off = offsetForIndex(idx);
+          el.style.setProperty("--x", (c.x + off.ox) + "px");
+          el.style.setProperty("--y", (c.y + off.oy) + "px");
+        }else if(prev !== p.pos){
+          animateSteps(p.id, prev, p.pos, idx, isMe, p.emoji);
+        }else{
+          const el = ensureEl(p.id, isMe, p.emoji);
+          const c = tileCenterFor(p.pos);
+          const off = offsetForIndex(idx);
+          el.style.setProperty("--x", (c.x + off.ox) + "px");
+          el.style.setProperty("--y", (c.y + off.oy) + "px");
+        }
+        local._tok.prevPos[p.id] = p.pos;
       });
     }
 
-    // Update prev positions
-    for(const p of Object.values(state.players||{})){
-      if(!p) continue;
-      prev[p.id] = p.pos;
+    // Cleanup removed players
+    const aliveIds = new Set(players.map(p=>p.id));
+    for(const uid of Object.keys(local._tok.els)){
+      if(!aliveIds.has(uid)){
+        cancelAnim(uid);
+        local._tok.els[uid].remove();
+        delete local._tok.els[uid];
+        delete local._tok.prevPos[uid];
+      }
     }
   }
 
@@ -2371,7 +2606,7 @@ function renderBoardTokens(){
     $("roundView").textContent = `라운드 ${state.round} / ${ROUNDS_MAX}`;
     const cp = currentPlayer();
     $("turnTag").textContent = cp ? `TURN: ${cp.name}` : "—";
-    $("lastRoll").textContent = state.lastRoll ?? "—";
+    $("lastRoll").textContent = (state.lastRoll && typeof state.lastRoll==="object") ? `${state.lastRoll.d1}+${state.lastRoll.d2}=${state.lastRoll.sum}${state.lastRoll.double?"(더블)":""}` : (state.lastRoll ?? "—");
 
     renderBoard();
     renderSide();
@@ -2408,6 +2643,19 @@ function renderBoardTokens(){
 
   await netInit_(rid);
   if(!NET.enabled){ toast("멀티 연결 실패…"); return; }
+
+  // If the game already started, latecomers must enter as spectator
+  if(state && state.phase && state.phase !== "WAIT"){
+    toast("게임이 이미 시작되어 관전으로 입장해요 👀");
+    local.role = "SPECTATOR";
+    local.meId = null;
+    $("joinPanel").style.display = "none";
+    $("gamePanel").style.display = "grid";
+    $("roomIdView").textContent = rid;
+    $("chatRoomView").textContent = rid;
+    setBanner(`👀 관전 모드! (roomId=${rid})`);
+    return;
+  }
 
   $("joinPanel").style.display = "none";
   $("gamePanel").style.display = "grid";
@@ -2467,8 +2715,9 @@ $("btnOrderRoll").onclick = () => {
   if(local.mode==="FB"){
     if($("btnOrderRoll").dataset.busy==="1") return;
     $("btnOrderRoll").dataset.busy="1";
-    const fake = rand(1,6);
-    animateDice(fake, ()=>{
+    const f1 = rand(1,6);
+    const f2 = rand(1,6);
+    animateDicePair(f1, f2, ()=>{
       emitAction_("ORDER_ROLL", {});
       $("btnOrderRoll").dataset.busy="0";
     });
@@ -2509,7 +2758,7 @@ $("btnLeave").onclick = () => { beepCute("click"); try{ notifyOpener_("LEAVE", {
   $("btnHelp").onclick = () => {
     beepCute("click");
     showModal({
-      title:"📜 규칙 (10라운드 / 펜트하우스화)",
+      title:"📜 규칙 (30라운드 / 펜트하우스화)",
       body:`
         <div class="hint">
           ✅ 인원: <b>2~5명</b><br/>
