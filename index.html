@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>🧋글자수 부루마블 [PATCHED15-anim-ui-winner-leavefix]</title>
+  <title>🧋글자수 부루마블 [PATCHED16-track-2dice-double-slump30]</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Jua&family=Nunito:wght@700;800;900&display=swap');
 :root{
@@ -210,7 +210,31 @@
       60%{transform:rotate(-10deg) scale(.98)}
       100%{transform:rotate(0deg) scale(1)}
     }
-    .centerTop{
+    
+    .diceWrap{ display:flex; gap:10px; align-items:center; justify-content:center; }
+
+    /* Floating tokens (inner track) */
+    .tokenLayer{ position:absolute; inset:0; pointer-events:none; z-index:6; }
+    .fToken{
+      position:absolute; width:34px; height:34px;
+      display:flex; align-items:center; justify-content:center;
+      font-size:22px; transform: translate(-50%, -50%);
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,.45));
+      transition: left 220ms linear, top 220ms linear, transform 220ms ease;
+    }
+    .fToken.me{
+      transform: translate(-50%, -50%) scale(1.22);
+      filter: drop-shadow(0 3px 12px rgba(255,124,200,.55)) drop-shadow(0 0 14px rgba(255,124,200,.35));
+    }
+    .fToken.bump{ animation: fBump .28s ease-out 1; }
+    @keyframes fBump{
+      0%{transform: translate(-50%, -50%) scale(0.96)}
+      60%{transform: translate(-50%, -50%) scale(1.30)}
+      100%{transform: translate(-50%, -50%) scale(1.18)}
+    }
+    /* 1pt smaller tile labels */
+    .tile .name{ font-size: 11px; }
+.centerTop{
       width:100%;
       display:flex;
       align-items:center;
@@ -586,13 +610,17 @@
       <div class="boardWrap" id="gamePanel" style="display:none;">
 
         <div class="board">
+          <div class="tokenLayer" id="tokenLayer" aria-hidden="true"></div>
           <div class="boardGrid" id="boardGrid">
             <div class="center">
               <div class="centerTop">
-                <div class="round" id="roundView">라운드 0 / 10</div>
+                <div class="round" id="roundView">라운드 0 / 30</div>
                 <span class="tag" id="turnTag">—</span>
               </div>
-              <div class="dice" id="dice">🎲</div>
+              <div class="diceWrap" id="diceWrap">
+                <div class="dice" id="diceA">🎲</div>
+                <div class="dice" id="diceB">🎲</div>
+              </div>
               <div class="row" style="margin-top:12px; justify-content:center;">
                 <button class="btn primary" id="btnOrderRoll">시작 굴림</button>
                 <button class="btn good" id="btnRoll">굴리기</button>
@@ -885,6 +913,35 @@ setInterval(() => {
       $("roomIdView").textContent = state.roomId || NET.roomId;
       $("phaseView").textContent = (state.phase||"WAIT");
       renderAll();
+      // --- Smooth move animation (client-side) ---
+      try{
+        const mv = state.lastMove;
+        if(mv && mv.at){
+          local._seenMoveAt = local._seenMoveAt || 0;
+          if(mv.at > local._seenMoveAt){
+            local._seenMoveAt = mv.at;
+            (async()=>{
+              const uid = mv.uid;
+              const steps = mv.steps||0;
+              if(steps>0 && state && state.players && state.players[uid]){
+                const start = mv.from;
+                const n = state.tiles.length;
+                local._animPos = local._animPos || {};
+                for(let i=1;i<=steps;i++){
+                  local._animPos[uid] = (start + i) % n;
+                  renderBoardTokens();
+                  await new Promise(r=>setTimeout(r, 220));
+                }
+                delete local._animPos[uid];
+                renderBoardTokens();
+              }else{
+                renderBoardTokens();
+              }
+            })();
+          }
+        }
+      }catch(e){}
+
 
       // GAME_OVER handling: show summary modal once per game, and auto-reset room (host)
       if(state.phase === "GAME_OVER"){
@@ -1048,7 +1105,7 @@ function applyActionAsHost_(key, a){
       return (order[idx] === actorUid);
     }
 
-    function rollDeterministic_(){ return rand(1,6); }
+    function rollDeterministic2_(){ const d1=rand(1,6), d2=rand(1,6); return {d1,d2,sum:d1+d2,isDouble:(d1===d2)}; }
 
     function moveImmediate_(p, steps){
       const n = state.tiles.length;
@@ -1070,7 +1127,7 @@ function applyActionAsHost_(key, a){
           const alive = Object.values(state.players||{}).filter(p=>p && !p.bankrupt);
           if(alive.length){
             alive.sort((a,b)=>(b.letters-a.letters) || ((b.owned?.length||0)-(a.owned?.length||0)));
-            state.gameOver = { winnerId: alive[0].id, reason: "10라운드 종료", at: Date.now() };
+            state.gameOver = { winnerId: alive[0].id, reason: "30라운드 종료", at: Date.now() };
           }else{
             state.gameOver = { winnerId: null, reason: "종료", at: Date.now() };
           }
@@ -1104,10 +1161,9 @@ function applyActionAsHost_(key, a){
         hostAdvanceTurn_(true);
         return;
       }
-      if(p.skip > 0){
-        p.skip -= 1;
-        hostLog('😵 ' + p.name + ' 슬럼프… 이번 턴 쉬기 (남은 ' + p.skip + ')');
-        hostAdvanceTurn_(true);
+      if((p.slumpTurns||0) > 0){
+        state.pending = { rolled:false, steps:0, landedTileId:null, canBuy:false, canUpgrade:false, canLoan:canLoan(p), canRepay:canRepay(p), slump:true, double:false };
+        hostLog('😵 ' + p.name + ' 슬럼프… 더블이 나와야 탈출 (남은 ' + p.slumpTurns + ')');
         return;
       }
       state.pending = {
@@ -1204,22 +1260,49 @@ function applyActionAsHost_(key, a){
         if(state.phase!=="PLAY") break;
         if(!isActorsTurn_()) break;
         if(state.pending?.rolled) break;
-        const p = state.players[actorUid];
-        const n = rollDeterministic_();
-        state.lastRoll = n;
-        state.pending.rolled = true;
-        state.pending.steps = n;
-        hostLog('🎲 ' + p.name + ' 굴림: ' + n);
 
-        moveImmediate_(p, n);
+        const p = state.players[actorUid];
+        const fromPos = (typeof p.pos === "number") ? p.pos : 0;
+
+        const {d1,d2,sum,isDouble} = rollDeterministic2_();
+        state.lastRoll = `${d1}+${d2}=${sum}` + (isDouble ? " (더블!)" : "");
+        state.pending.rolled = true;
+        state.pending.double = isDouble;
+
+        if((p.slumpTurns||0) > 0){
+          if(isDouble){
+            p.slumpTurns = 0;
+            hostLog(`✨ ${p.name} 더블! 슬럼프 탈출! (이동 ${sum}칸)`);
+          }else{
+            p.slumpTurns = Math.max(0, (p.slumpTurns||0) - 1);
+            hostLog(`😵 ${p.name} 슬럼프… 더블 실패! (남은 갇힘 ${p.slumpTurns})`);
+            state.lastMove = {uid: actorUid, from: fromPos, to: fromPos, steps: 0, d1, d2, sum, isDouble:false, at: Date.now()};
+            hostAdvanceTurn_(true);
+            break;
+          }
+        }
+
+        hostLog(`🎲 ${p.name} 굴림: ${d1}+${d2} = ${sum}${isDouble ? " (더블!)" : ""}`);
+
+        moveImmediate_(p, sum);
         const tile = tileAt(p.pos);
+
+        state.lastMove = {uid: actorUid, from: fromPos, to: p.pos, steps: sum, d1, d2, sum, isDouble, at: Date.now()};
+
+        state.pending.steps = sum;
         state.pending.landedTileId = tile.id;
+
         if(tile.type === TileType.START) applyStartLand(p);
         resolveLanding(p, tile);
-        // auto-advance if no property decision (buy/upgrade)
+
         const needChoice = !!(state.pending && (state.pending.canBuy || state.pending.canUpgrade));
         if(!needChoice){
-          hostAdvanceTurn_(true);
+          if(state.pending.double){
+            hostLog(`🎉 더블 보너스! ${p.name} 한 번 더!`);
+            hostTurnStart_();
+          }else{
+            hostAdvanceTurn_(true);
+          }
         }
         break;
       }
@@ -1227,15 +1310,26 @@ function applyActionAsHost_(key, a){
         if(!state.players || !state.players[actorUid]) break;
         if(!isActorsTurn_()) break;
         hostBuy_(actorUid);
-        // after tile action, auto-advance
-        hostAdvanceTurn_(true);
+        if(state.pending?.double){
+          const p = state.players[actorUid];
+          hostLog(`🎉 더블 보너스! ${p.name} 한 번 더!`);
+          hostTurnStart_();
+        }else{
+          hostAdvanceTurn_(true);
+        }
         break;
       }
       case "UPGRADE": {
         if(!state.players || !state.players[actorUid]) break;
         if(!isActorsTurn_()) break;
         hostUpgrade_(actorUid);
-        hostAdvanceTurn_(true);
+        if(state.pending?.double){
+          const p = state.players[actorUid];
+          hostLog(`🎉 더블 보너스! ${p.name} 한 번 더!`);
+          hostTurnStart_();
+        }else{
+          hostAdvanceTurn_(true);
+        }
         break;
       }
       case "LOAN": {
@@ -1334,7 +1428,7 @@ function applyActionAsHost_(key, a){
   /* ===============================
      Game data
   =============================== */
-  const ROUNDS_MAX = 10;
+  const ROUNDS_MAX = 30;
   const START_LETTERS = 15000;
 
   const TileType = {
@@ -1613,9 +1707,32 @@ function applyActionAsHost_(key, a){
   }
 
   function diceRoll(){ return rand(1,6); }
+  function rollTwoDice_(){ return {d1:rand(1,6), d2:rand(1,6)}; }
+
+  function animateDice2(d1, d2, cb){
+    const a = $("diceA"), b = $("diceB");
+    const faces = ["⚀","⚁","⚂","⚃","⚄","⚅"];
+    [a,b].forEach(x=>{ if(!x) return; x.classList.add("rolling"); x.classList.add("pop"); });
+    let ticks = 0;
+    const interval = setInterval(()=>{
+      if(a) a.textContent = faces[rand(0,5)];
+      if(b) b.textContent = faces[rand(0,5)];
+      ticks++;
+      if(ticks>=14){
+        clearInterval(interval);
+        [a,b].forEach(x=>{ if(!x) return; x.classList.remove("rolling"); });
+        if(a) a.textContent = faces[Math.max(0, Math.min(5, (d1||1)-1))];
+        if(b) b.textContent = faces[Math.max(0, Math.min(5, (d2||1)-1))];
+        [a,b].forEach(x=>{ if(!x) return; x.classList.add("finish"); setTimeout(()=>x.classList.remove("finish"), 220); });
+        cb?.();
+      }
+    }, 45);
+    setTimeout(()=>{ [a,b].forEach(x=>{ if(!x) return; x.classList.remove("pop"); }); }, 260);
+  }
+
 
   function animateDice(finalN, cb){
-    const d = $("dice");
+    const d = $("diceA");
     d.classList.add("rolling");
     d.classList.add("pop");
     let ticks = 0;
@@ -1758,17 +1875,24 @@ function applyActionAsHost_(key, a){
     const pid = currentPid();
     const p = state.players[pid];
     if(!p || p.bankrupt){ advanceTurn(true); return; }
-    if(p.skip > 0){
-      p.skip -= 1;
-      pushLog(`😵 ${p.name} 슬럼프… 이번 턴 쉬기 (남은 ${p.skip})`);
-      setBanner(`😵 <b>${p.name}</b> 슬럼프! 이번 턴 스킵…`);
-      advanceTurn(true);
+
+    if((p.slumpTurns||0) > 0){
+      state.pending = {
+        rolled:false, steps:0, landedTileId:null,
+        canBuy:false, canUpgrade:false,
+        canLoan:canLoan(p), canRepay:canRepay(p),
+        slump:true, double:false
+      };
+      setBanner(`😵 <b>${p.name}</b> 슬럼프! <b>더블</b>이 나와야 탈출… (남은 ${p.slumpTurns}턴)`);
+      renderAll();
       return;
     }
+
     state.pending = {
       rolled:false, steps:0, landedTileId:null,
       canBuy:false, canUpgrade:false,
-      canLoan:canLoan(p), canRepay:canRepay(p)
+      canLoan:canLoan(p), canRepay:canRepay(p),
+      double:false
     };
     setBanner(`🎲 <b>${p.name}</b> 님 차례! 굴려서 월세 탈출 가자…`);
     renderAll();
@@ -1806,11 +1930,80 @@ function applyActionAsHost_(key, a){
     if(isOrderRoll){
       if(state.phase !== "ORDER_ROLL") return;
       if(p.orderRoll != null){ toast("이미 굴렸어요!"); return; }
-    }else{
-      if(state.phase !== "PLAY") return;
-      if(!isMyTurn()){ toast("내 차례가 아니에요!"); return; }
-      if(state.pending?.rolled){ toast("이미 굴렸어요!"); return; }
+      const n = diceRoll();
+      state.lastRoll = n;
+      $("lastRoll").textContent = n;
+      // show both dice as a fun visual even for order roll
+      animateDice2(n, 7-n, ()=>{});
+      p.orderRoll = n;
+      pushLog(`🎲 시작 굴림: ${p.name} = ${n}`);
+      if(local.mode==="FB"){ emitAction_("ORDER_ROLL", {n}); }
+      renderAll();
+      // host will move phase when everyone rolled
+      return;
     }
+
+    if(state.phase !== "PLAY") return;
+    if(!isMyTurn()){ toast("내 차례가 아니에요!"); return; }
+    if(state.pending?.rolled){ toast("이미 굴렸어요!"); return; }
+
+    const {d1, d2} = rollTwoDice_();
+    const sum = d1 + d2;
+    const isDouble = (d1 === d2);
+
+    // Firebase(host) mode: host resolves; we just animate + emit.
+    if(local.mode==="FB"){
+      animateDice2(d1,d2, ()=>{
+        emitAction_("ROLL", {d1,d2,sum,isDouble});
+      });
+      return;
+    }
+
+    animateDice2(d1,d2, async ()=>{
+      state.lastRoll = `${d1}+${d2}=${sum}` + (isDouble ? " (더블!)" : "");
+      $("lastRoll").textContent = state.lastRoll;
+
+      // 슬럼프(감옥): 더블이면 즉시 탈출 + 이동, 아니면 1턴 소모 (최대 2턴)
+      if((p.slumpTurns||0) > 0){
+        if(isDouble){
+          p.slumpTurns = 0;
+          pushLog(`✨ ${p.name} 더블! 슬럼프 탈출! (이동 ${sum}칸)`);
+        }else{
+          p.slumpTurns = Math.max(0, (p.slumpTurns||0) - 1);
+          pushLog(`😵 ${p.name} 슬럼프… 더블 실패! (남은 갇힘 ${p.slumpTurns}턴)`);
+          setBanner(`😵 슬럼프! 더블이 나와야 탈출… (남은 ${p.slumpTurns}턴)`);
+          state.pending.rolled = true;
+          state.pending.steps = 0;
+          advanceTurn(true);
+          renderAll();
+          return;
+        }
+      }
+
+      pushLog(`🎲 ${p.name} 굴림: ${d1}+${d2} = ${sum}${isDouble ? " (더블!)" : ""}`);
+      state.pending.rolled = true;
+      state.pending.steps = sum;
+      state.pending.double = isDouble;
+
+      await moveSteps(p.id, sum);
+      const tile = tileAt(p.pos);
+      state.pending.landedTileId = tile.id;
+      if(tile.type === TileType.START) applyStartLand(p);
+      resolveLanding(p, tile);
+
+      const needChoice = !!(state.pending.canBuy || state.pending.canUpgrade);
+      if(!needChoice){
+        if(state.pending.double){
+          pushLog(`🎉 더블 보너스! ${p.name} 한 번 더!`);
+          state.pending = null;
+          onTurnStart();
+        }else{
+          advanceTurn(true);
+        }
+      }
+      renderAll();
+    });
+  }
 
     beepCute("dice");
     const n = diceRoll();
@@ -1873,19 +2066,16 @@ function applyActionAsHost_(key, a){
 
   function applyRest(p, tile){
     if(tile.key==="SLUMP"){
-      p.skip = Math.max(p.skip, 1);
-      pushLog(`😵 ${p.name} 슬럼프! 다음 턴 쉬기 1회`);
-      setBanner(`😵 슬럼프! 다음 턴 쉬기…`);
+      p.slumpTurns = Math.max(p.slumpTurns||0, 2);
+      pushLog(`😵 ${p.name} 슬럼프! 더블이 나와야 탈출 (최대 2턴)`);
+      setBanner(`😵 슬럼프! <b>더블</b>이 나와야 탈출… (최대 2턴)`);
       return;
     }
     if(tile.key==="MOVE"){
       const step = rand(1,3);
       pushLog(`🚚 이사! 앞으로 ${step}칸 이동!`);
       setBanner(`🚚 이사! 앞으로 ${step}칸!`);
-      // IMPORTANT: In Firebase(host) mode, do NOT use async animation here.
-      // Async movement inside host transaction can cause repeated re-entry / "빙빙빙" loops.
       if(local.mode==="FB" && NET.isHost){
-        // immediate movement with START pass handling
         const n = state.tiles.length;
         for(let i=0;i<step;i++){
           p.pos = (p.pos + 1) % n;
@@ -1894,13 +2084,11 @@ function applyActionAsHost_(key, a){
         const nt = tileAt(p.pos);
         state.pending.landedTileId = nt.id;
         if(nt.type === TileType.START) applyStartLand(p);
-        // prevent accidental nested MOVE loops (just in case)
         state._restMoveDepth = (state._restMoveDepth||0) + 1;
         if(state._restMoveDepth < 3) resolveLanding(p, nt);
         state._restMoveDepth = 0;
         return;
       }
-      // Non-host / local mode: keep cute movement animation
       (async()=>{
         await moveSteps(p.id, step);
         const nt = tileAt(p.pos);
@@ -1977,33 +2165,55 @@ function applyActionAsHost_(key, a){
   }
 
   function actBuy(){
-    if(state.phase!=="PLAY" || !isMyTurn()) return;
+    if(state.phase!=="PLAY") return;
+    if(!isMyTurn()) return;
     const p = currentPlayer();
     const tile = tileAt(p.pos);
-    if(tile.type!=="PROPERTY" || tile.owner) return;
-    if(p.letters < tile.price){ toast("글자수가 부족해요!"); return; }
+    if(tile.type!==TileType.PROPERTY || tile.owner) { toast("매입 불가"); return; }
+    if(p.letters < tile.price){ toast("글자수가 부족해요"); return; }
+
+    if(local.mode==="FB"){ emitAction_("BUY"); return; }
+
     tile.owner = p.id;
     tile.level = 1;
     p.letters -= tile.price;
     p.owned.push(tile.id);
     pushLog(`🏠 매입! ${tile.name} (-${fmt(tile.price)}자)`);
-    setBanner(`🏠 매입 완료! 내 집 됐다 💖`);
+    state.pending.canBuy = false;
+
+    if(state.pending?.double){
+      pushLog(`🎉 더블 보너스! ${p.name} 한 번 더!`);
+      state.pending = null;
+      onTurnStart();
+    }else{
+      advanceTurn(true);
+    }
     renderAll();
-    // 자동 다음 차례
-    setTimeout(()=>{ try{ advanceTurn(); renderAll(); }catch(e){} }, 120);
   }
   function actUpgrade(){
-    if(state.phase!=="PLAY" || !isMyTurn()) return;
+    if(state.phase!=="PLAY") return;
+    if(!isMyTurn()) return;
     const p = currentPlayer();
     const tile = tileAt(p.pos);
-    if(tile.type!=="PROPERTY" || tile.owner!==p.id){ toast("내 집이 아니에요!"); return; }
+    if(tile.type!==TileType.PROPERTY || tile.owner!==p.id){ toast("업그레이드 불가"); return; }
     const uc = upgradeCost(tile);
-    if(uc==null){ toast("업그레이드 불가"); return; }
-    if(p.letters < uc){ toast("글자수가 부족해요!"); return; }
+    if(uc==null){ toast("이미 최고 단계!"); return; }
+    if(p.letters < uc){ toast("글자수가 부족해요"); return; }
+
+    if(local.mode==="FB"){ emitAction_("UPGRADE"); return; }
+
     p.letters -= uc;
-    tile.level += 1;
-    pushLog(`🛠️ 업글! ${tile.name} → ${Upgrade[tile.level-1].label} (-${fmt(uc)}자)`);
-    setBanner(`🛠️ ${Upgrade[tile.level-1].label} 달성!`);
+    tile.level = (tile.level||1)+1;
+    pushLog(`🛠️ 펜트하우스화! ${tile.name} (-${fmt(uc)}자)`);
+    state.pending.canUpgrade = false;
+
+    if(state.pending?.double){
+      pushLog(`🎉 더블 보너스! ${p.name} 한 번 더!`);
+      state.pending = null;
+      onTurnStart();
+    }else{
+      advanceTurn(true);
+    }
     renderAll();
   }
   function actLoan(){
@@ -2278,41 +2488,63 @@ function applyActionAsHost_(key, a){
 
   
 function renderBoardTokens(){
-    // Track position changes for a tiny "move pop" animation (visual only)
     local._prevPos = local._prevPos || {};
     const prev = local._prevPos;
 
-    // Clear
     document.querySelectorAll(".tile .tokens").forEach(x=>x.innerHTML="");
+
+    const layer = $("tokenLayer");
+    if(!layer) return;
+    layer.innerHTML = "";
+
+    const board = document.querySelector(".board");
+    const centerEl = document.querySelector(".center");
+    if(!board || !centerEl) return;
+
+    const brect = board.getBoundingClientRect();
+    const crect = centerEl.getBoundingClientRect();
+    const cx = (crect.left + crect.right)/2 - brect.left;
+    const cy = (crect.top + crect.bottom)/2 - brect.top;
 
     const posMap = new Map();
     for(const p of Object.values(state.players||{})){
-      if(p.bankrupt) continue;
-      const arr = posMap.get(p.pos) || [];
+      if(!p || p.bankrupt) continue;
+      const effPos = (local._animPos && local._animPos[p.id] != null) ? local._animPos[p.id] : p.pos;
+      const arr = posMap.get(effPos) || [];
       arr.push(p);
-      posMap.set(p.pos, arr);
+      posMap.set(effPos, arr);
     }
 
     for(const [pos, arr] of posMap.entries()){
-      const holder = document.querySelector(`.tile[data-id="${pos}"] .tokens`);
-      if(!holder) continue;
+      const tileEl = document.querySelector(`.tile[data-id="${pos}"]`);
+      if(!tileEl) continue;
+      const r = tileEl.getBoundingClientRect();
+      const tx = (r.left + r.right)/2 - brect.left;
+      const ty = (r.top + r.bottom)/2 - brect.top;
+
+      const pull = 0.28;
+      const baseX = tx + (cx - tx) * pull;
+      const baseY = ty + (cy - ty) * pull;
 
       arr.forEach((p, idx)=>{
-        const t = document.createElement("div");
+        const el = document.createElement("div");
         const was = prev[p.id];
         const moved = (was != null && was !== p.pos);
-        t.className = "token" + (p.id===local.meId ? " me" : "") + (moved ? " moved" : "");
 
-        const dx = (idx%3) * 12;
-        const dy = Math.floor(idx/3) * -10;
-        t.style.setProperty("--dx", dx+"px");
-        t.style.setProperty("--dy", dy+"px");
-        t.textContent = p.emoji;
-        holder.appendChild(t);
+        el.className = "fToken" + (p.id===local.meId ? " me" : "") + (moved ? " bump" : "");
+        el.textContent = p.emoji;
+
+        const angle = (idx * 2*Math.PI) / Math.max(3, arr.length);
+        const rad = 12 + Math.floor(idx/6)*10;
+        const ox = Math.cos(angle) * rad;
+        const oy = Math.sin(angle) * rad;
+
+        el.style.left = (baseX + ox) + "px";
+        el.style.top  = (baseY + oy) + "px";
+        layer.appendChild(el);
       });
     }
 
-    // Update prev positions
     for(const p of Object.values(state.players||{})){
       if(!p) continue;
       prev[p.id] = p.pos;
