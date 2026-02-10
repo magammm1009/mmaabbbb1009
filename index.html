@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>🧋글자수 부루마블 [PATCHED14-multiplayer-roomfix]</title>
+  <title>🧋글자수 부루마블 [PATCHED15-anim-ui-winner-leavefix]</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Jua&family=Nunito:wght@700;800;900&display=swap');
 :root{
@@ -270,7 +270,7 @@
       filter: drop-shadow(0 2px 5px rgba(0,0,0,.28));
     }
     .tile .name .tLabel{
-      font-size:18px;
+      font-size:17px;
       line-height:1.18;
       display:-webkit-box;
       -webkit-box-orient:vertical;
@@ -291,7 +291,7 @@
     @media (max-width: 520px){
       .tile .name{gap:5px}
       .tile .name .tEmoji{font-size:18px; line-height:1.05; margin-bottom:2px}
-      .tile .name .tLabel{font-size:16px; line-height:1.18; letter-spacing:.55px}
+      .tile .name .tLabel{font-size:15px; line-height:1.18; letter-spacing:.55px}
       .tile .name .tSub{font-size:12px; line-height:1.15; margin-top:2px}
       .dice{width:72px;height:72px;font-size:38px}
     }
@@ -325,6 +325,20 @@
       filter: drop-shadow(0 2px 5px rgba(0,0,0,.35));
       transform: translateX(var(--dx, 0px)) translateY(var(--dy, 0px));
     }
+
+    .token.me{
+      filter: drop-shadow(0 3px 10px rgba(255,124,200,.55)) drop-shadow(0 0 14px rgba(255,124,200,.35));
+      transform: translateX(var(--dx, 0px)) translateY(var(--dy, 0px)) scale(1.18);
+    }
+    .token.moved{
+      animation: tokenPop .28s ease-out 1;
+    }
+    @keyframes tokenPop{
+      0%{transform: translateX(var(--dx, 0px)) translateY(var(--dy, 0px)) scale(0.92)}
+      60%{transform: translateX(var(--dx, 0px)) translateY(var(--dy, 0px)) scale(1.26)}
+      100%{transform: translateX(var(--dx, 0px)) translateY(var(--dy, 0px)) scale(1.12)}
+    }
+
     .tile.current{
       outline:2px solid rgba(255,209,102,.55);
       box-shadow: 0 0 0 4px rgba(255,209,102,.10);
@@ -544,6 +558,7 @@
           <span class="pill" id="pillPhase">PHASE <span class="mono" id="phaseView">WAIT</span></span>
         </div>
         <button class="btn" id="btnHelp">규칙</button>
+        <button class="btn" id="btnLeave">방 나가기</button>
         <button class="btn bad" id="btnReset">리셋</button>
       </div>
 
@@ -914,6 +929,21 @@ try{
       winnerEmoji: winner2 ? winner2.emoji : null,
       reason: go.reason || '게임 종료'
     });
+
+    // ✅ 게임 종료 시스템 메시지를 '게임 채팅'에도 1회 기록
+    try{
+      const go = state.gameOver || {};
+      const key = String(go.at||state.resetAt||"") + ":" + String(go.winnerId||"");
+      if(local._sentWinnerChatKey !== key){
+        local._sentWinnerChatKey = key;
+        const winnerName = (winner2 && winner2.name) ? winner2.name : (go.winnerId||"알 수 없음");
+        const winnerEmoji = (winner2 && winner2.emoji) ? winner2.emoji : "🏆";
+        const reasonTxt = (go.reason||"게임 종료");
+        if(NET.chatRef){
+          NET.chatRef.push({ts: Date.now(), who:"SYSTEM", sys:true, txt:`🏁 게임 종료! 승자: ${winnerEmoji} ${winnerName} (${reasonTxt})`});
+        }
+      }
+    }catch(e){}
     // 1.2초 후 자동 닫기/복귀 (사용자가 모달을 볼 시간)
     setTimeout(()=>{ try{ closeOrReturn_(); }catch(e){} }, 1200);
   }
@@ -2246,8 +2276,15 @@ function applyActionAsHost_(key, a){
     renderBoardTokens();
   }
 
-  function renderBoardTokens(){
+  
+function renderBoardTokens(){
+    // Track position changes for a tiny "move pop" animation (visual only)
+    local._prevPos = local._prevPos || {};
+    const prev = local._prevPos;
+
+    // Clear
     document.querySelectorAll(".tile .tokens").forEach(x=>x.innerHTML="");
+
     const posMap = new Map();
     for(const p of Object.values(state.players||{})){
       if(p.bankrupt) continue;
@@ -2255,12 +2292,17 @@ function applyActionAsHost_(key, a){
       arr.push(p);
       posMap.set(p.pos, arr);
     }
+
     for(const [pos, arr] of posMap.entries()){
       const holder = document.querySelector(`.tile[data-id="${pos}"] .tokens`);
       if(!holder) continue;
+
       arr.forEach((p, idx)=>{
         const t = document.createElement("div");
-        t.className = "token";
+        const was = prev[p.id];
+        const moved = (was != null && was !== p.pos);
+        t.className = "token" + (p.id===local.meId ? " me" : "") + (moved ? " moved" : "");
+
         const dx = (idx%3) * 12;
         const dy = Math.floor(idx/3) * -10;
         t.style.setProperty("--dx", dx+"px");
@@ -2268,6 +2310,12 @@ function applyActionAsHost_(key, a){
         t.textContent = p.emoji;
         holder.appendChild(t);
       });
+    }
+
+    // Update prev positions
+    for(const p of Object.values(state.players||{})){
+      if(!p) continue;
+      prev[p.id] = p.pos;
     }
   }
 
@@ -2378,12 +2426,30 @@ if($("chatInp")) $("chatInp").addEventListener("keydown", (e)=>{ if(e.key==="Ent
   // Multiplayer: everyone emits actions, host applies and broadcasts state
 $("btnOrderRoll").onclick = () => {
   beepCute("dice");
-  if(local.mode==="FB") return emitAction_("ORDER_ROLL", {});
+  if(local.mode==="FB"){
+    if($("btnOrderRoll").dataset.busy==="1") return;
+    $("btnOrderRoll").dataset.busy="1";
+    const fake = rand(1,6);
+    animateDice(fake, ()=>{
+      emitAction_("ORDER_ROLL", {});
+      $("btnOrderRoll").dataset.busy="0";
+    });
+    return;
+  }
   return handleRollDice(true);
 };
 $("btnRoll").onclick = () => {
   beepCute("dice");
-  if(local.mode==="FB") return emitAction_("ROLL", {});
+  if(local.mode==="FB"){
+    if($("btnRoll").dataset.busy==="1") return;
+    $("btnRoll").dataset.busy="1";
+    const fake = rand(1,6);
+    animateDice(fake, ()=>{
+      emitAction_("ROLL", {});
+      $("btnRoll").dataset.busy="0";
+    });
+    return;
+  }
   return handleRollDice(false);
 };
 $("btnBuy").onclick = () => { beepCute("click"); if(local.mode==="FB") return emitAction_("BUY", {}); actBuy(); };
@@ -2391,6 +2457,7 @@ $("btnUpgrade").onclick = () => { beepCute("click"); if(local.mode==="FB") retur
 $("btnLoan").onclick = () => { beepCute("click"); if(local.mode==="FB") return emitAction_("LOAN", {}); actLoan(); };
 $("btnRepay").onclick = () => { beepCute("click"); if(local.mode==="FB") return emitAction_("REPAY", {}); actRepay(); };
 $("btnEnd").onclick = () => { beepCute("click"); if(local.mode==="FB") return emitAction_("END", {}); actEndTurn(); };
+$("btnLeave").onclick = () => { beepCute("click"); try{ notifyOpener_("LEAVE", {name: local.chatName||local.meId||""}); }catch(e){} try{ closeOrReturn_(); }catch(e){} };
 
   // Hotseat: current player controls
   const _renderAll = renderAll;
