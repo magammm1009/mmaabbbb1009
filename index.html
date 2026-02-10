@@ -635,7 +635,8 @@
               </div>
               <div class="diceWrap"><div class="dice" id="dice">🎲</div><div class="dice" id="dice2">🎲</div></div>
               <div class="row" style="margin-top:12px; justify-content:center;">
-                <button class="btn primary" id="btnOrderRoll">시작 굴림</button>
+                <button class="btn primary" id="btnStartGame" style="display:none;">게임 시작</button>
+            <button class="btn primary" id="btnOrderRoll">시작 굴림</button>
                 <button class="btn good" id="btnRoll">굴리기</button>
                 <button class="btn" id="btnEnd">턴 종료</button>
               </div>
@@ -719,14 +720,6 @@
             <div id="tileInfo" class="hint">말이 멈춘 칸 정보가 여기 떠요.</div>
           </div>
         </div>
-
-        <div class="fineprint">
-   
-       
-        </div>
-      </div>
-    </div>
-  </div>
 
   <div class="toast" id="toast"></div>
 
@@ -1234,19 +1227,19 @@ function applyActionAsHost_(key, a){
         } else {
           state.players[actorUid].name = name;
         }
-
-        if(Object.keys(state.players||{}).length >= 2 && (state.phase==="WAITING" || state.phase==="WAIT" || !state.phase)) {
+break;
+      }
+      case "START_ORDER": {
+        const waiting = (state.phase==="WAITING" || state.phase==="WAIT" || !state.phase);
+        const pc = Object.keys(state.players||{}).length;
+        if(waiting && pc>=2){
           startOrderPhase();
         }
         break;
       }
       case "ORDER_ROLL": {
-        // If we are still waiting, allow "시작 굴림" to also kick off the order-roll phase.
-        if(state.phase!=="ORDER_ROLL"){
-          const waiting = (state.phase==="WAITING" || state.phase==="WAIT" || !state.phase);
-          const pc = Object.keys(state.players||{}).length;
-          if(waiting && pc>=2) startOrderPhase();
-        }
+        // 시작 굴림은 "게임 시작" 이후(ORDER_ROLL 단계)에서만 허용합니다.
+        if(state.phase!=="ORDER_ROLL") break;
         if(state.phase!=="ORDER_ROLL") break;
         if(!state.players || !state.players[actorUid]) break;
         const p = state.players[actorUid];
@@ -2244,22 +2237,22 @@ function applyActionAsHost_(key, a){
     const waiting = (!ph || ph==="WAIT" || ph==="WAITING");
     const pc = Object.keys(state.players||{}).length;
     const canStartOrder = waiting && pc>=2;
-    // Show "시작 굴림" both during ORDER_ROLL and when waiting with enough players (host can kick it off).
-    $("btnOrderRoll").style.display = (ph==="ORDER_ROLL" || canStartOrder) ? "" : "none";
+    // Host-only: show "게임 시작" in WAITING; show "시작 굴림" only during ORDER_ROLL.
+    $("btnStartGame").style.display = (waiting && canStartOrder && NET && NET.isHost) ? "" : "none";
+    $("btnOrderRoll").style.display = (ph==="ORDER_ROLL") ? "" : "none";
+    $("btnStartGame").disabled = !(waiting && canStartOrder && NET && NET.isHost);
+    $("btnStartGame").textContent = "🚀 게임 시작";
+    $("btnStartGame").title = "호스트가 눌러서 순서 정하기(시작 굴림) 단계로 넘어가요";
     $("btnRoll").style.display = (ph==="PLAY") ? "" : "none";
     $("btnEnd").style.display = (ph==="PLAY") ? "" : "none";
 
     const isMy = ph==="PLAY" && isMyTurn();
     const pend = state.pending || {};
 
-        $("btnOrderRoll").disabled = (ph==="ORDER_ROLL")
-      ? !(my && my.orderRoll==null)
-      : !(canStartOrder && NET && NET.isHost);
+        $("btnOrderRoll").disabled = !(ph==="ORDER_ROLL" && (my && my.orderRoll==null));
     try{
       $("btnOrderRoll").textContent = "🎲 시작 굴림";
-      $("btnOrderRoll").title = (ph==="ORDER_ROLL")
-        ? "순서 정하기: 아직 안 굴린 사람만 눌러요"
-        : (canStartOrder ? (NET && NET.isHost ? "호스트가 순서 정하기를 시작해요" : "호스트만 시작할 수 있어요") : "플레이어 2명 이상 필요");
+      $("btnOrderRoll").title = (ph==="ORDER_ROLL") ? "순서 정하기: 아직 안 굴린 사람만 눌러요" : ""; 
     }catch(e){}
     $("btnRoll").disabled = !(isMy && !pend.rolled);
     $("btnEnd").disabled = !(isMy);
@@ -2819,6 +2812,19 @@ if($("chatInp")) $("chatInp").addEventListener("keydown", (e)=>{ if(e.key==="Ent
   if($("btnLocalStart")) $("btnLocalStart").onclick = () => { toast("로컬 모드는 제거되었어요 🙂"); };
 
   // Multiplayer: everyone emits actions, host applies and broadcasts state
+
+$("btnStartGame").onclick = () => {
+  beepCute("ok");
+  if(local.mode==="FB"){
+    // Host starts the order-roll phase (allows up to 5 players to join before this).
+    emitAction_("START_ORDER", {});
+    return;
+  }
+  // Local-only mode
+  startOrderPhase();
+  renderAll();
+};
+
 $("btnOrderRoll").onclick = () => {
   beepCute("dice");
   if(local.mode==="FB"){
