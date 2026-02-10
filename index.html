@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>🧋글자수 부루마블 [PATCHED13-session+nicknamefix]</title>
+  <title>🧋글자수 부루마블 [PATCHED14-multiplayer-roomfix]</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Jua&family=Nunito:wght@700;800;900&display=swap');
 :root{
@@ -720,7 +720,7 @@ function closeOrReturn_(){
   }
 }
 
-const APP_VERSION = "PATCHED10-gameover+movefix";
+const APP_VERSION = "PATCHED14-multiplayer-roomfix";
 console.log("BB APP VERSION:", APP_VERSION);
 document.title = (document.title||"Burumabul") + " ["+APP_VERSION+"]";
 
@@ -2301,7 +2301,7 @@ function applyActionAsHost_(key, a){
     const base = (AUTO_ROOM_ID || "SUDABANG").trim() || "SUDABANG";
     // ✅ gs(게임세션)가 있으면 방 키에 포함해서 '항상 새 판'을 보장
     const gs = (GAME_SESSION||"").trim();
-    const rid = (gs ? `${base}__${gs}` : base);
+    const rid = base; // ✅ 모두 같은 sid 방으로 동기화 (gs는 표시용/캐시우회용으로만 사용)
     return rid.toUpperCase();
   }
   function ensureName(){
