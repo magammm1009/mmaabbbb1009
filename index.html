@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>🧋글자수 부루마블 [PATCHED12-nicknamefix] (월세→자가→펜트하우스)</title>
+  <title>🧋글자수 부루마블 [PATCHED13-session+nicknamefix]</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Jua&family=Nunito:wght@700;800;900&display=swap');
 :root{
@@ -1499,7 +1499,9 @@ function applyActionAsHost_(key, a){
   const local = {
     mode: "LOCAL",    // LOCAL only in this MVP
     meId: null,
-    role: "PLAYER",   // PLAYER | SPECTATOR
+    role: "PLAYER",
+  entered: false,
+  chatName: "",   // PLAYER | SPECTATOR
   };
 
   function setState(next){
@@ -2088,7 +2090,7 @@ function applyActionAsHost_(key, a){
     const text = (inp.value||"").trim();
     if(!text) return;
     if(!NET.enabled || !NET.inited || !NET.chatRef){ toast("채팅 연결이 아직이에요!"); return; }
-    const name = ensureName() || (AUTO_NAME || null);
+    const name = (local.chatName || ensureName() || (AUTO_NAME || "익명"));
     const role = local.role === "SPECTATOR" ? "SPECTATOR" : "PLAYER";
     inp.value = "";
     try{
@@ -2276,7 +2278,7 @@ function applyActionAsHost_(key, a){
 
     // join panel should stay available for latecomers while the game is still joinable (WAITING / ORDER_ROLL)
     const joinable = !!state && (state.phase === "WAITING" || state.phase === "ORDER_ROLL");
-    const showJoin = (!state) || (joinable && !local.meId);
+    const showJoin = (!local.entered) || (state && state.phase === "GAME_OVER");
     $("joinPanel").style.display = showJoin ? "" : "none";
     $("gamePanel").style.display = showJoin ? "none" : "grid";
 
@@ -2295,9 +2297,12 @@ function applyActionAsHost_(key, a){
      UI wiring
   =============================== */
   function ensureRoomId(){
-    // 수다방에서 넘어온 sid를 방 코드로 고정
-    const rid = (AUTO_ROOM_ID || "SUDABANG").trim();
-    return rid ? rid.toUpperCase() : "SUDABANG";
+    // 수다방에서 넘어온 sid/room을 기본 방 코드로 사용
+    const base = (AUTO_ROOM_ID || "SUDABANG").trim() || "SUDABANG";
+    // ✅ gs(게임세션)가 있으면 방 키에 포함해서 '항상 새 판'을 보장
+    const gs = (GAME_SESSION||"").trim();
+    const rid = (gs ? `${base}__${gs}` : base);
+    return rid.toUpperCase();
   }
   function ensureName(){
 
@@ -2314,7 +2319,6 @@ function applyActionAsHost_(key, a){
   const name = ensureName();
   if(!name || name==="익명"){ toast("닉네임을 입력해줘! (익명 말고!)"); return; }
   try{ localStorage.setItem("bb_last_name", name); }catch(e){}
-  local.meName = name;
 
   await netInit_(rid);
   if(!NET.enabled){ toast("멀티 연결 실패…"); return; }
@@ -2324,6 +2328,8 @@ function applyActionAsHost_(key, a){
   $("roomIdView").textContent = rid;
   $("chatRoomView").textContent = rid;
 
+  local.entered = true;
+  local.chatName = name;
   emitAction_("JOIN", {name});
   setBanner(`🔗 멀티 연결 완료! (roomId=${rid})`);
 };
@@ -2331,27 +2337,24 @@ function applyActionAsHost_(key, a){
 $("btnSpectate").onclick = async () => {
   beepCute("click");
   local.role = "SPECTATOR";
-  const rid = ensureRoomId();
-
-  // ✅ 관전자도 닉네임 필수 (익명 방지)
   const name = ensureName();
-  if(!name || name==="익명"){ toast("닉네임을 입력해줘! (익명 말고!)"); return; }
+  if(!name || name==="익명"){ toast("닉네임을 입력해줘! (관전도 닉네임 필수!)"); return; }
   try{ localStorage.setItem("bb_last_name", name); }catch(e){}
-  local.meName = name;
-
+  local.chatName = name;
+  local.entered = true;
+  const rid = ensureRoomId();
   await netInit_(rid);
   if(!NET.enabled){ toast("멀티 연결 실패…"); return; }
 
   // 관전은 플레이어로 JOIN하지 않음 (채팅은 가능)
   local.meId = null;
-  local.meName = name;
 
   $("joinPanel").style.display = "none";
   $("gamePanel").style.display = "grid";
   $("roomIdView").textContent = rid;
   $("chatRoomView").textContent = rid;
 
-  toast("관전으로 입장했어 👀");
+  setBanner(`👀 관전 모드! (roomId=${rid})`);
 };
 
 // chat UI
