@@ -2645,7 +2645,11 @@ function renderBoardTokens(){
   if(!NET.enabled){ toast("멀티 연결 실패…"); return; }
 
   // If the game already started, latecomers must enter as spectator
-  if(state && state.phase && state.phase !== "WAIT"){
+  // NOTE: we treat WAIT and WAITING as the same "lobby" phase.
+  // Some versions display PHASE WAITING, so we must not mis-classify a fresh room as "started".
+  const ph = (state && state.phase) ? String(state.phase).toUpperCase() : "WAITING";
+  const started = (ph !== "WAIT" && ph !== "WAITING"); // only non-wait phases are truly started
+  if(started){
     toast("게임이 이미 시작되어 관전으로 입장해요 👀");
     local.role = "SPECTATOR";
     local.meId = null;
