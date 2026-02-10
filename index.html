@@ -1,0 +1,2461 @@
+﻿<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>🧋글자수 부루마블 [PATCHED10-gameover+movefix] (월세→자가→펜트하우스)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Jua&family=Nunito:wght@700;800;900&display=swap');
+:root{
+      --bg:#0f1220;
+      --panel:#151a2e;
+      --panel2:#101427;
+      --line:rgba(255,255,255,.10);
+      --text:rgba(255,255,255,.92);
+      --muted:rgba(255,255,255,.70);
+      --accent:#ff7cc8;
+      --good:#7CFFB2;
+      --bad:#FF6B6B;
+      --warn:#FFD166;
+      --tile:#192042;
+      --tile2:#141a35;
+      --shadow: 0 10px 24px rgba(0,0,0,.28);
+      --r:22px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: "Jua","Nunito","Apple SD Gothic Neo","Noto Sans KR", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Helvetica Neue", sans-serif;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:var(--sans);
+      background:
+        radial-gradient(1200px 600px at 20% -10%, rgba(255,124,200,.30), transparent 60%),
+        radial-gradient(900px 500px at 100% 10%, rgba(124,255,178,.18), transparent 60%),
+        radial-gradient(1000px 500px at 30% 120%, rgba(255,209,102,.14), transparent 60%),
+        var(--bg);
+      color:var(--text);
+      min-height:100vh;
+    }
+    a{color:inherit}
+    .app{
+      max-width:1240px;
+      margin:0 auto;
+      padding:18px;
+      display:grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap:16px;
+    }
+    @media (max-width: 980px){
+      .app{grid-template-columns:1fr; padding:12px}
+    }
+    .card{
+      background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      border:1px solid var(--line);
+      border-radius: var(--r);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .topbar{
+      padding:12px 14px;
+      display:flex;
+      gap:10px;
+      align-items:center;
+      border-bottom:1px solid var(--line);
+      background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.00));
+    }
+    .title{
+      font-weight:800;
+      letter-spacing:-.3px;
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex: 1 1 auto;
+      min-width:0;
+    }
+    .pill{
+      font-family:var(--mono);
+      font-size:12px;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:rgba(0,0,0,.20);
+      color:var(--muted);
+      display:inline-flex;
+      gap:8px;
+      align-items:center;
+      white-space:nowrap;
+    }
+    .btn{
+      border:1px solid var(--line);
+      background:rgba(0,0,0,.22);
+      color:var(--text);
+      padding:10px 12px;
+      border-radius:12px;
+      cursor:pointer;
+      font-weight:700;
+      transition:transform .06s ease, background .12s ease, border-color .12s ease;
+      user-select:none;
+      white-space:nowrap;
+    }
+    .btn:hover{background:rgba(255,255,255,.06)}
+    .btn:active{transform:translateY(1px)}
+    .btn.primary{
+      border-color: rgba(255,124,200,.40);
+      background: rgba(255,124,200,.18);
+    }
+    .btn.good{
+      border-color: rgba(124,255,178,.40);
+      background: rgba(124,255,178,.14);
+    }
+    .btn.bad{
+      border-color: rgba(255,107,107,.40);
+      background: rgba(255,107,107,.12);
+    }
+    .btn:disabled{
+      opacity:.45;
+      cursor:not-allowed;
+    }
+    .grid{
+      display:grid;
+      gap:12px;
+      padding:14px;
+    }
+    .row{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+    .row > *{flex: 0 0 auto}
+    .field{
+      flex:1 1 auto;
+      min-width:180px;
+      display:flex;
+      gap:8px;
+      align-items:center;
+    }
+    input, select{
+      width:100%;
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background:rgba(0,0,0,.25);
+      color:var(--text);
+      outline:none;
+    }
+    input::placeholder{color:rgba(255,255,255,.45)}
+    .hint{color:var(--muted); font-size:13px; line-height:1.45}
+    .mono{font-family:var(--mono)}
+    .split{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:12px;
+    }
+    @media (max-width:520px){ .split{grid-template-columns:1fr} }
+
+    /* --- Board --- */
+    .boardWrap{padding:14px}
+    .board{
+      width:100%;
+      max-width: 780px;
+      margin: 0 auto;
+      aspect-ratio: 1 / 1;
+      border-radius: 22px;
+      border:1px solid var(--line);
+      background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.16));
+      position:relative;
+      overflow:hidden;
+    }
+
+    .boardGrid{
+      position:absolute; inset:0;
+      display:grid;
+      grid-template-columns: repeat(7, 1fr);
+      grid-template-rows: repeat(7, 1fr);
+      gap:6px;
+      padding:10px;
+    }
+    .center{
+      grid-column: 2 / span 5;
+      grid-row: 2 / span 5;
+      border-radius: 18px;
+      border:1px dashed rgba(255,255,255,.18);
+      background: radial-gradient(400px 220px at 50% 40%, rgba(255,124,200,.14), transparent 70%),
+                  radial-gradient(420px 240px at 50% 60%, rgba(124,255,178,.10), transparent 72%),
+                  rgba(0,0,0,.18);
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      align-items:center;
+      padding:10px;
+      min-width:0;
+    }
+    .dice{
+      width:84px; height:84px;
+      border-radius:24px;
+      border:1px solid rgba(255,255,255,.20);
+      background:linear-gradient(180deg, rgba(255,255,255,.10), rgba(0,0,0,.18));
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:44px;
+      font-weight:900;
+      box-shadow: 0 12px 26px rgba(0,0,0,.30);
+      transform-origin:center;
+    }
+    .dice.rolling{
+      animation: roll .55s ease-in-out infinite;
+    }
+    .dice.pop{ filter: drop-shadow(0 10px 16px rgba(0,0,0,.28)); }
+    .dice.finish{ animation: finishPop .22s ease-out 1; }
+    @keyframes finishPop{ 0%{transform:scale(1)} 60%{transform:scale(1.10)} 100%{transform:scale(1)} }
+    @keyframes roll{
+      0%{transform:rotate(0deg) scale(1)}
+      30%{transform:rotate(12deg) scale(1.03)}
+      60%{transform:rotate(-10deg) scale(.98)}
+      100%{transform:rotate(0deg) scale(1)}
+    }
+    .centerTop{
+      width:100%;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin-bottom:10px;
+      min-width:0;
+    }
+    .centerTop .round{
+      font-weight:900;
+      letter-spacing:-.3px;
+      white-space:nowrap;
+    }
+    .banner{
+      width:100%;
+      margin-top:10px;
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background:rgba(0,0,0,.20);
+      font-size:13px;
+      color:var(--muted);
+      min-width:0;
+    }
+    .banner b{color:var(--text)}
+    .banner .nowrap{
+      display:-webkit-box;
+      -webkit-box-orient:vertical;
+      -webkit-line-clamp:2;
+      overflow:hidden;
+      display:block;
+    }
+
+    .tile{
+      border-radius:18px;
+      border:1px solid rgba(255,255,255,.10);
+      background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(0,0,0,.18));
+      position:relative;
+      overflow:hidden;
+      padding:6px 7px 20px 7px;
+      min-width:0;
+    }
+    .tile .name{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      margin:0;
+      font-weight:900;
+      letter-spacing:.8px;
+      line-height:1.15;
+      min-width:0;
+    }
+    .tile .name .tEmoji{
+      font-size:20px;
+      line-height:1.05;
+      margin-bottom:2px;
+      filter: drop-shadow(0 2px 5px rgba(0,0,0,.28));
+    }
+    .tile .name .tLabel{
+      font-size:18px;
+      line-height:1.18;
+      display:-webkit-box;
+      -webkit-box-orient:vertical;
+      -webkit-line-clamp:2;
+      overflow:hidden;
+      word-break:keep-all;
+      letter-spacing:.6px;
+    }
+    .tile .name .tSub{
+      font-size:13px;
+      line-height:1.15;
+      opacity:.86;
+      letter-spacing:1.0px;
+      margin-top:2px;
+    }
+    .tile .sub{display:none;}
+    
+    @media (max-width: 520px){
+      .tile .name{gap:5px}
+      .tile .name .tEmoji{font-size:18px; line-height:1.05; margin-bottom:2px}
+      .tile .name .tLabel{font-size:16px; line-height:1.18; letter-spacing:.55px}
+      .tile .name .tSub{font-size:12px; line-height:1.15; margin-top:2px}
+      .dice{width:72px;height:72px;font-size:38px}
+    }
+.tile .badge{
+      position:absolute; right:7px; top:7px;
+      font-size:11px;
+      padding:4px 8px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.16);
+      background:rgba(0,0,0,.18);
+      color:rgba(255,255,255,.75);
+      font-family:var(--mono);
+    }
+    .tile .ownerBar{
+      position:absolute; left:0; right:0; bottom:0;
+      height:12px;
+      border-top:1px solid rgba(255,255,255,.10);
+      background: transparent;
+      display:none;
+    }
+    .tile .tokens{
+      position:absolute; left:6px; bottom:14px;
+      display:flex;
+      gap:0;
+      pointer-events:none;
+    }
+    .token{
+      width:26px; height:26px;
+      display:flex; align-items:center; justify-content:center;
+      font-size:18px;
+      filter: drop-shadow(0 2px 5px rgba(0,0,0,.35));
+      transform: translateX(var(--dx, 0px)) translateY(var(--dy, 0px));
+    }
+    .tile.current{
+      outline:2px solid rgba(255,209,102,.55);
+      box-shadow: 0 0 0 4px rgba(255,209,102,.10);
+    }
+
+    /* Arrange 24 tiles around outer border in 7x7 grid (center is 5x5) */
+    .pos-0  {grid-column:7; grid-row:7;}
+    .pos-1  {grid-column:6; grid-row:7;}
+    .pos-2  {grid-column:5; grid-row:7;}
+    .pos-3  {grid-column:4; grid-row:7;}
+    .pos-4  {grid-column:3; grid-row:7;}
+    .pos-5  {grid-column:2; grid-row:7;}
+    .pos-6  {grid-column:1; grid-row:7;}
+    .pos-7  {grid-column:1; grid-row:6;}
+    .pos-8  {grid-column:1; grid-row:5;}
+    .pos-9  {grid-column:1; grid-row:4;}
+    .pos-10 {grid-column:1; grid-row:3;}
+    .pos-11 {grid-column:1; grid-row:2;}
+    .pos-12 {grid-column:1; grid-row:1;}
+    .pos-13 {grid-column:2; grid-row:1;}
+    .pos-14 {grid-column:3; grid-row:1;}
+    .pos-15 {grid-column:4; grid-row:1;}
+    .pos-16 {grid-column:5; grid-row:1;}
+    .pos-17 {grid-column:6; grid-row:1;}
+    .pos-18 {grid-column:7; grid-row:1;}
+    .pos-19 {grid-column:7; grid-row:2;}
+    .pos-20 {grid-column:7; grid-row:3;}
+    .pos-21 {grid-column:7; grid-row:4;}
+    .pos-22 {grid-column:7; grid-row:5;}
+    .pos-23 {grid-column:7; grid-row:6;}
+
+
+    .side{
+      padding:14px;
+      display:grid;
+      gap:12px;
+    }
+    .section{
+      border:1px solid var(--line);
+      background:rgba(0,0,0,.18);
+      border-radius:16px;
+      overflow:hidden;
+    }
+    .section .hdr{
+      padding:10px 12px;
+      border-bottom:1px solid var(--line);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      font-weight:900;
+      letter-spacing:-.3px;
+      background:rgba(255,255,255,.04);
+    }
+    .section .body{padding:10px 12px; display:grid; gap:10px}
+    .plist{
+      display:grid;
+      gap:8px;
+    }
+    .pitem{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:10px 10px;
+      border:1px solid rgba(255,255,255,.10);
+      background:rgba(0,0,0,.16);
+      border-radius:14px;
+    }
+    .pitem.me{outline:2px solid rgba(255,124,200,.45)}
+    .pitem.dead{opacity:.55; filter:grayscale(.35)}
+    .pname{
+      display:flex; gap:10px; align-items:center; min-width:0;
+    }
+    .pname .emoji{font-size:20px}
+    .pname .n{
+      font-weight:900; letter-spacing:-.2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+      max-width: 180px;
+    }
+    .pmeta{
+      font-family:var(--mono);
+      font-size:12px;
+      color:rgba(255,255,255,.74);
+      text-align:right;
+      white-space:nowrap;
+    }
+    .log{
+      font-family:var(--mono);
+      font-size:12px;
+      line-height:1.45;
+      color:rgba(255,255,255,.78);
+      max-height: 260px;
+      overflow:auto;
+      padding-right:6px;
+    }
+    .log .line{margin:0 0 6px 0}
+
+    .chatlog{
+      font-family:var(--mono);
+      font-size:12px;
+      line-height:1.45;
+      color:rgba(255,255,255,.86);
+      max-height: 220px;
+      overflow:auto;
+      padding-right:6px;
+      display:grid;
+      gap:6px;
+    }
+    .chatmsg{
+      padding:8px 10px;
+      border:1px solid rgba(255,255,255,.10);
+      background:rgba(0,0,0,.14);
+      border-radius:14px;
+    }
+    .chatmsg .m1{display:flex; gap:8px; align-items:center; justify-content:space-between}
+    .chatmsg .who{font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+    .chatmsg .when{opacity:.68; font-size:11px; font-family:var(--mono)}
+    .chatmsg .txt{margin-top:4px; color:rgba(255,255,255,.90); word-break:break-word}
+    .chatSendRow{display:flex; gap:8px; align-items:center}
+    .chatSendRow input{flex:1 1 auto; min-width:0}
+    .kpi{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:8px;
+    }
+    .kpi .box{
+      border:1px solid rgba(255,255,255,.10);
+      background:rgba(0,0,0,.16);
+      border-radius:14px;
+      padding:10px;
+    }
+    .kpi .box .t{font-size:12px; color:rgba(255,255,255,.72)}
+    .kpi .box .v{font-family:var(--mono); font-weight:900; font-size:16px; margin-top:4px}
+    .toast{
+      position:fixed;
+      left:50%;
+      bottom:16px;
+      transform:translateX(-50%);
+      padding:10px 12px;
+      border-radius: 14px;
+      border:1px solid rgba(255,255,255,.14);
+      background:rgba(0,0,0,.78);
+      color:rgba(255,255,255,.90);
+      box-shadow: var(--shadow);
+      display:none;
+      max-width: min(720px, calc(100vw - 24px));
+    }
+    .toast.show{display:block; animation:pop .18s ease}
+    @keyframes pop{from{transform:translateX(-50%) translateY(8px); opacity:.0} to{transform:translateX(-50%) translateY(0); opacity:1}}
+    .modalBack{
+      position:fixed; inset:0;
+      background: rgba(0,0,0,.55);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:14px;
+      z-index:40;
+    }
+    .modalBack.show{display:flex}
+    .modal{
+      width:min(680px, 100%);
+      border-radius: 18px;
+      border:1px solid rgba(255,255,255,.18);
+      background: rgba(18, 20, 40, .94);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .modal .mh{
+      padding:12px 14px;
+      border-bottom:1px solid rgba(255,255,255,.12);
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      font-weight:900;
+    }
+    .modal .mb{
+      padding:12px 14px;
+      display:grid; gap:10px;
+      color: rgba(255,255,255,.94);
+    }
+    .modal .actions{
+      padding:12px 14px;
+      border-top:1px solid rgba(255,255,255,.12);
+      display:flex; justify-content:flex-end; gap:10px; flex-wrap:wrap;
+    }
+    .tag{
+      display:inline-flex;
+      gap:6px;
+      align-items:center;
+      font-size:12px;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.14);
+      background:rgba(0,0,0,.20);
+      color:rgba(255,255,255,.78);
+      font-family:var(--mono);
+    }
+    .fineprint{font-size:12px; color:rgba(255,255,255,.62)}
+    .sep{height:1px; background:rgba(255,255,255,.10)}
+  </style>
+
+  <!-- Firebase (for realtime multiplayer) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+</head>
+<body>
+  <div class="app">
+    <!-- LEFT: BOARD -->
+    <div class="card">
+      <div class="topbar">
+        <div class="title">
+          <span style="font-size:20px">🏙️</span>
+          <span>글자수 부루마블</span>
+          <span class="pill" id="pillRoom">ROOM <span class="mono" id="roomIdView">—</span></span>
+          <span class="pill" id="pillPhase">PHASE <span class="mono" id="phaseView">WAIT</span></span>
+        </div>
+        <button class="btn" id="btnHelp">규칙</button>
+        <button class="btn bad" id="btnReset">리셋</button>
+      </div>
+
+      
+      <div class="grid" id="joinPanel">
+        <div class="section">
+          <div class="hdr">부루마블 입장</div>
+          <div class="body">
+            <div class="row">
+              <div class="field"><input id="inpName" placeholder="닉네임" /></div>
+            </div>
+            <div class="row">
+              <button class="btn primary" id="btnJoin">🎲 참여(플레이어)</button>
+              <button class="btn" id="btnSpectate">👀 관전</button>
+            </div>
+            <div class="hint">
+              ✅ 수다방에서 <b>부루마블</b>을 누르면 자동으로 같은 방으로 들어와요.<br/>
+              ✅ <b>플레이어</b>는 2~5명, <b>관전자</b>는 인원 제한 없이 입장 가능!<br/>
+              ✅ 채팅은 <b>플레이어/관전자 모두</b> 사용 가능 💬
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="boardWrap" id="gamePanel" style="display:none;">
+
+        <div class="board">
+          <div class="boardGrid" id="boardGrid">
+            <div class="center">
+              <div class="centerTop">
+                <div class="round" id="roundView">라운드 0 / 10</div>
+                <span class="tag" id="turnTag">—</span>
+              </div>
+              <div class="dice" id="dice">🎲</div>
+              <div class="row" style="margin-top:12px; justify-content:center;">
+                <button class="btn primary" id="btnOrderRoll">시작 굴림</button>
+                <button class="btn good" id="btnRoll">굴리기</button>
+                <button class="btn" id="btnEnd">턴 종료</button>
+              </div>
+              <div class="row" style="margin-top:10px; justify-content:center;">
+                <button class="btn" id="btnBuy">매입</button>
+                <button class="btn" id="btnUpgrade">펜트하우스화</button>
+                <button class="btn" id="btnLoan">대출</button>
+                <button class="btn" id="btnRepay">상환</button>
+              </div>
+              <div class="banner" id="banner">
+                <span class="nowrap">💖 준비되면 <b>시작 굴림</b>을 눌러 순서를 정해요.</span>
+              </div>
+            </div>
+            <!-- tiles injected -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: SIDE PANEL -->
+    <div class="card">
+      <div class="topbar">
+        <div class="title">
+          <span style="font-size:20px">🧾</span>
+          <span>상태판</span>
+        </div>
+      </div>
+
+      <div class="side">
+        <div class="section">
+          <div class="hdr">
+            <span>플레이어</span>
+            <span class="pill">ALIVE <span class="mono" id="aliveCount">0</span></span>
+          </div>
+          <div class="body">
+            <div class="kpi">
+              <div class="box">
+                <div class="t">내 말</div>
+                <div class="v" id="meEmoji">—</div>
+              </div>
+              <div class="box">
+                <div class="t">내 글자수</div>
+                <div class="v" id="meLetters">—</div>
+              </div>
+            </div>
+            <div class="plist" id="plist"></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="hdr">
+            <span>로그</span>
+            <span class="pill">LAST <span class="mono" id="lastRoll">—</span></span>
+          </div>
+          <div class="body">
+            <div class="log" id="log"></div>
+          </div>
+        </div>
+
+        
+        <div class="section">
+          <div class="hdr">
+            <span>채팅</span>
+            <span class="pill">ROOM <span class="mono" id="chatRoomView">—</span></span>
+          </div>
+          <div class="body">
+            <div class="chatlog" id="chatLog"></div>
+            <div class="chatSendRow">
+              <input id="chatInp" placeholder="메시지…" maxlength="200"/>
+              <button class="btn" id="chatSend">전송</button>
+            </div>
+            <div class="hint">플레이어/관전자 모두 채팅 가능 💬</div>
+          </div>
+        </div>
+<div class="section">
+          <div class="hdr">
+            <span>칸 정보</span>
+            <span class="pill" id="tilePill">—</span>
+          </div>
+          <div class="body">
+            <div id="tileInfo" class="hint">말이 멈춘 칸 정보가 여기 떠요.</div>
+          </div>
+        </div>
+
+        <div class="fineprint">
+          💡 팁: 버튼이 안 죽게 하려면 “턴 상태(phase)”를 엄격히 나눠야 해요.<br/>
+          이 파일은 멀티 연동 전에도 재미있게 굴러가도록 <b>로컬 MVP</b>로 만든 버전입니다.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <div class="modalBack" id="modalBack">
+    <div class="modal">
+      <div class="mh">
+        <span id="modalTitle">알림</span>
+        <button class="btn" id="modalClose">닫기</button>
+      </div>
+      <div class="mb" id="modalBody"></div>
+      <div class="actions" id="modalActions"></div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  /* ===============================
+     Cute utilities
+  =============================== */
+  const $ = (id) => document.getElementById(id);
+// ---- 수다방에서 넘어온 값: sid(방), u(닉네임), returnUrl(복귀), gs(게임세션) ----
+const qp = new URLSearchParams(location.search);
+const AUTO_ROOM_ID = (qp.get('sid')||qp.get('roomId')||qp.get('room')||'SUDABANG').trim() || 'SUDABANG';
+const AUTO_NAME = (qp.get('u')||qp.get('name')||'').trim();
+const RETURN_URL = (qp.get('returnUrl')||qp.get('return')||'').trim();
+const GAME_SESSION = (qp.get('gs')||qp.get('game')||'').trim();
+
+// opener(수다방)에게 알리기 (같은 출처가 아니어도 postMessage는 됨)
+function notifyOpener_(type, data){
+  try{
+    if(window.opener && !window.opener.closed){
+      window.opener.postMessage(Object.assign({source:'WRITER_MARBLE', type, roomId: AUTO_ROOM_ID, gs: GAME_SESSION}, data||{}), '*');
+    }
+  }catch(e){}
+}
+function closeOrReturn_(){
+  // 1) 팝업으로 열린 창이면 닫기 시도
+  try{
+    if(window.opener && !window.opener.closed){
+      window.close();
+      // close가 막히는 브라우저도 있으니 fallback
+    }
+  }catch(e){}
+  // 2) 복귀 URL이 있으면 그쪽으로 이동
+  if(RETURN_URL){
+    try{ location.href = RETURN_URL; }catch(e){}
+  }
+}
+
+const APP_VERSION = "PATCHED10-gameover+movefix";
+console.log("BB APP VERSION:", APP_VERSION);
+document.title = (document.title||"Burumabul") + " ["+APP_VERSION+"]";
+
+try{
+  $("roomIdView").textContent = AUTO_ROOM_ID;
+  $("chatRoomView").textContent = AUTO_ROOM_ID;
+}catch(e){}
+
+try{
+  if($("inpName")){
+    // 1) URL에서 넘어온 닉네임이 '익명'이 아니면 우선 사용
+    const qpName = (AUTO_NAME||"").trim();
+    if(qpName && qpName !== "익명"){
+      $("inpName").value = qpName;
+    }else{
+      // 2) URL이 비었으면, 브라우저에 저장된 마지막 닉네임을 불러와서 *미리 채우기만* (자동참여 X)
+      const saved = (localStorage.getItem("bb_last_name")||"").trim();
+      if(saved && saved !== "익명") $("inpName").value = saved;
+    }
+
+    // 3) '익명' / 빈 값이면 입력칸을 비워서 반드시 입력하도록
+    const v = ($("inpName").value||"").trim();
+    if(!v || v === "익명"){
+      $("inpName").value = "";
+      $("inpName").placeholder = "닉네임(필수)";
+    }
+  }
+}catch(e){}
+
+
+/* ===============================
+   Firebase multiplayer (same room = same board)
+   - Host-driven action log:
+     everyone pushes actions -> host applies -> state broadcast
+=============================== */
+const firebaseConfig = {
+  apiKey: "AIzaSyAQYp8_sfgHMnH7KsTOdGgpMc1niarZiSs",
+  authDomain: "boomboom1009-ae518.firebaseapp.com",
+  databaseURL: "https://boomboom1009-ae518-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "boomboom1009-ae518",
+  storageBucket: "boomboom1009-ae518.firebasestorage.app",
+  messagingSenderId: "954818391824",
+  appId: "1:954818391824:web:477eb52436aafdb5d67f95"
+};
+
+const NET = {
+  enabled: true,
+  inited: false,
+  uid: null,
+  roomId: null,
+  isHost: false,
+  db: null,
+  root: null,
+  stateRef: null,
+  actionsRef: null,
+  metaRef: null,
+  chatRef: null,
+};
+
+async function netInit_(roomId){
+  // Allow retry even if a previous attempt failed
+  NET.enabled = true;
+  NET.lastError = null;
+  if(NET.inited && NET.roomId===roomId) return;
+
+  try{
+    if(!firebase.apps || !firebase.apps.length) firebase.initializeApp(firebaseConfig);
+  }catch(e){ try{ firebase.initializeApp(firebaseConfig); }catch(_){} }
+
+  NET.db = firebase.database();
+  NET.root = NET.db.ref("games/marble/" + roomId);
+  NET.stateRef = NET.root.child("state");
+  NET.actionsRef = NET.root.child("actions");
+  NET.metaRef = NET.root.child("meta");
+  NET.chatRef = NET.root.child("chat");
+  NET.roomId = roomId;
+
+  try{
+    await firebase.auth().signInAnonymously();
+    NET.uid = firebase.auth().currentUser && firebase.auth().currentUser.uid;
+  }catch(e){
+    console.warn("anon auth failed", e);
+    // Don't permanently disable multiplayer — allow retry on Join/Spectate.
+    NET.lastError = e;
+    return;
+  }
+
+  const hostUidRef = NET.metaRef.child("hostUid");
+  const STALE_MS = 15000;
+
+  await hostUidRef.transaction(cur => cur || NET.uid);
+
+  
+// Host action pump: attach when I am host (and backfill last N actions).
+function startHostPump_(){
+  try{
+    if(NET._hostPumpOn) return;
+    NET._hostPumpOn = true;
+    NET._hostChildAdded = (snap) => {
+      const a = snap.val();
+      if(!a || !a.type) return;
+      applyActionAsHost_(snap.key, a);
+    };
+    // When listener attaches, RTDB will replay existing children (up to last N),
+    // so we won't miss early JOIN / ORDER_ROLL actions.
+    NET.actionsRef.limitToLast(400).on("child_added", NET._hostChildAdded);
+  }catch(e){
+    console.warn("host pump attach failed", e);
+  }
+}
+function stopHostPump_(){
+  try{
+    if(!NET._hostPumpOn) return;
+    NET._hostPumpOn = false;
+    if(NET._hostChildAdded) NET.actionsRef.off("child_added", NET._hostChildAdded);
+  }catch(e){}
+}
+
+let _wasHost = false;
+NET.metaRef.on("value", snap => {
+  const v = snap.val() || {};
+  const beat = v.hostBeat || 0;
+  const host = v.hostUid || null;
+  if(host && host !== NET.uid && Date.now() - beat > STALE_MS){
+    hostUidRef.transaction(cur => (cur === host ? NET.uid : cur));
+  }
+  NET.isHost = (v.hostUid === NET.uid);
+  if(NET.isHost && !_wasHost) startHostPump_();
+  if(!NET.isHost && _wasHost) stopHostPump_();
+  _wasHost = NET.isHost;
+});
+
+setInterval(() => {
+    if(!NET.enabled) return;
+    if(!NET.uid) return;
+    if(NET.isHost){
+      NET.metaRef.update({ hostUid: NET.uid, hostBeat: firebase.database.ServerValue.TIMESTAMP });
+    }
+  }, 5000);
+
+  NET.stateRef.on("value", snap => {
+    const s = snap.val();
+    if(s){
+      state = normalizeState_(s, NET.roomId) || newState(NET.roomId);
+      local.mode = "FB";
+      local.meId = (local.role === "SPECTATOR") ? null : NET.uid;
+      $("roomIdView").textContent = state.roomId || NET.roomId;
+      $("phaseView").textContent = (state.phase||"WAIT");
+      renderAll();
+
+      // GAME_OVER handling: show summary modal once per game, and auto-reset room (host)
+      if(state.phase === "GAME_OVER"){
+        try{
+          const go = state.gameOver || {};
+          const alive = Object.values(state.players||{}).filter(p=>p && !p.bankrupt);
+          let winner = (go.winnerId && state.players && state.players[go.winnerId]) ? state.players[go.winnerId] : null;
+          if(!winner && alive.length){
+            alive.sort((a,b)=>(b.letters-a.letters) || ((b.owned?.length||0)-(a.owned?.length||0)));
+            winner = alive[0];
+          }
+          const shownKey = String(go.at||state.resetAt||"") + ":" + String(go.winnerId||"");
+          if(local._shownGameOverKey !== shownKey){
+            local._shownGameOverKey = shownKey;
+            const wname = winner ? winner.name : "—";
+            const wemo = winner ? winner.emoji : "";
+            const reason = go.reason || "게임 종료";
+            showModal({
+              title:"🏁 게임이 끝났어요!",
+              body:`<div style="font-size:16px; font-weight:900">승자: ${wemo} ${wname}</div>
+                    <div class="hint">사유: <b>${reason}</b></div>
+                    <div class="sep"></div>
+                    <div class="hint">다음 판은 자동으로 새 방처럼 초기화돼요. (약 8초)</div>`,
+              actions:[{text:"확인", kind:"primary", onClick:()=>{}}]
+            });
+          }
+// 👉 수다방(오프너)로 승자 알리고, 게임 창 자동 종료/복귀
+try{
+  const go = state.gameOver || {};
+  const shownKey = String(go.at||state.resetAt||"") + ":" + String(go.winnerId||"");
+  if(local._autoCloseKey !== shownKey){
+    local._autoCloseKey = shownKey;
+    const alive2 = Object.values(state.players||{}).filter(p=>p && !p.bankrupt);
+    let winner2 = (go.winnerId && state.players && state.players[go.winnerId]) ? state.players[go.winnerId] : null;
+    if(!winner2 && alive2.length){
+      alive2.sort((a,b)=>(b.letters-a.letters) || ((b.owned?.length||0)-(a.owned?.length||0)));
+      winner2 = alive2[0];
+    }
+    notifyOpener_('GAME_OVER', {
+      winnerId: winner2 ? winner2.id : null,
+      winnerName: winner2 ? winner2.name : null,
+      winnerEmoji: winner2 ? winner2.emoji : null,
+      reason: go.reason || '게임 종료'
+    });
+    // 1.2초 후 자동 닫기/복귀 (사용자가 모달을 볼 시간)
+    setTimeout(()=>{ try{ closeOrReturn_(); }catch(e){} }, 1200);
+  }
+}catch(e){}
+
+// 👉 호스트가 사라졌거나, resetAt이 지났는데도 초기화가 안 되면
+//    누구든지 1회 "리셋 시도"를 해서 다음 판이 항상 새로 시작하게.
+try{
+  if(state.resetAt && Date.now() > (state.resetAt + 500) && !local._anyResetTried){
+    local._anyResetTried = true;
+    // transaction: GAME_OVER 상태일 때만 새 상태로 교체
+    NET.stateRef.transaction(cur=>{
+      if(!cur) return;
+      if(cur.phase !== 'GAME_OVER') return;
+      if(!cur.resetAt) return;
+      if(Date.now() <= (cur.resetAt + 200)) return;
+      const ns = newState(NET.roomId);
+      return ns;
+    }, (err, committed)=>{
+      if(!err && committed){
+        try{ NET.actionsRef.remove(); }catch(e){}
+      }
+    });
+  }
+}catch(e){}
+        }catch(e){}
+        if(NET.isHost && state.resetAt){
+          const ms = Math.max(300, (state.resetAt - Date.now()));
+          if(!NET._resetTimer){
+            NET._resetTimer = setTimeout(()=>{
+              NET._resetTimer = null;
+              try{
+                // wipe actions (prevents huge replay) and reset state
+                NET.actionsRef.remove();
+                NET.stateRef.set(newState(NET.roomId));
+              }catch(e){}
+            }, ms);
+          }
+        }
+      }
+    }
+  });
+
+  // --- Chat (players + spectators) ---
+  try{
+    if(NET.chatRef){
+      NET.chatRef.off();
+      NET.chatRef.limitToLast(120).on("child_added", snap => {
+        const v = snap.val() || {};
+        appendChat_(v);
+      });
+      $("chatRoomView").textContent = NET.roomId;
+    }
+  }catch(e){}
+
+  // (host pump attached via meta watcher)
+
+NET.inited = true;
+}
+
+function emitAction_(type, payload={}){
+  if(!NET.enabled || !NET.inited) return;
+  const a = {
+    type,
+    uid: NET.uid,
+    payload: payload||{},
+    ts: firebase.database.ServerValue.TIMESTAMP
+  };
+  return NET.actionsRef.push(a);
+}
+
+function applyActionAsHost_(key, a){
+  NET.stateRef.transaction(cur => {
+    if(!cur) cur = newState(NET.roomId);
+    cur = normalizeState_(cur, NET.roomId) || newState(NET.roomId);
+    state = cur;
+    // --- defensive defaults for older/partial state blobs ---
+    if(!state.players) state.players = {};
+    if(!state.log) state.log = [];
+    if(!state.order) state.order = [];
+    if(typeof state.turnIndex !== 'number') state.turnIndex = 0;
+    if(!state._lastActionKey) state._lastActionKey = "";
+    if(state._lastActionKey >= key) return; // already processed
+
+    const actorUid = a.uid;
+
+    function hostLog(msg){
+      (state.log||(state.log=[])).unshift('[' + new Date().toLocaleTimeString('ko-KR') + '] ' + msg);
+      if(state.log.length>80) state.log.length=80;
+    }
+
+    function makePlayerWithId_(name, pid){
+      const p = makePlayer(name);
+      p.id = pid;
+      return p;
+    }
+
+    function isActorsTurn_(){
+      if(state.phase!=="PLAY") return false;
+      const order = Array.isArray(state.order) ? state.order : [];
+      const idx = (typeof state.turnIndex === "number") ? state.turnIndex : 0;
+      return (order[idx] === actorUid);
+    }
+
+    function rollDeterministic_(){ return rand(1,6); }
+
+    function moveImmediate_(p, steps){
+      const n = state.tiles.length;
+      p.pos = (p.pos + steps) % n;
+    }
+
+    function hostAdvanceTurn_(silent=true){
+      if(state.phase!=="PLAY") return;
+      const order = Array.isArray(state.order) ? state.order : [];
+      if(!order.length) return;
+      const prevIndex = (typeof state.turnIndex==="number") ? state.turnIndex : 0;
+      state.turnIndex = (prevIndex + 1) % order.length;
+
+      if(prevIndex === order.length - 1){
+        state.round = (state.round||0) + 1;
+        hostLog('📌 라운드 종료! 현재 ' + state.round + ' / ' + ROUNDS_MAX);
+        if(state.round > ROUNDS_MAX){
+          // Decide winner on host and lock GAME_OVER
+          const alive = Object.values(state.players||{}).filter(p=>p && !p.bankrupt);
+          if(alive.length){
+            alive.sort((a,b)=>(b.letters-a.letters) || ((b.owned?.length||0)-(a.owned?.length||0)));
+            state.gameOver = { winnerId: alive[0].id, reason: "10라운드 종료", at: Date.now() };
+          }else{
+            state.gameOver = { winnerId: null, reason: "종료", at: Date.now() };
+          }
+          state.phase = "GAME_OVER";
+          // schedule reset so the next entry is always fresh
+          state.resetAt = Date.now() + 8000;
+          return;
+        }
+      }
+
+      // skip bankrupt
+      let guard=0;
+      while(guard<20){
+        const pid = order[state.turnIndex];
+        const p = state.players && state.players[pid];
+        if(p && !p.bankrupt) break;
+        state.turnIndex = (state.turnIndex + 1) % order.length;
+        guard++;
+      }
+      hostTurnStart_();
+    }
+
+    function hostTurnStart_(){
+      if(state.phase!=="PLAY") return;
+      const order = Array.isArray(state.order) ? state.order : [];
+      if(!order.length) return;
+      const pid = order[(typeof state.turnIndex==="number")?state.turnIndex:0];
+      const p = state.players && state.players[pid];
+      if(!p){ return; }
+      if(p.bankrupt){
+        hostAdvanceTurn_(true);
+        return;
+      }
+      if(p.skip > 0){
+        p.skip -= 1;
+        hostLog('😵 ' + p.name + ' 슬럼프… 이번 턴 쉬기 (남은 ' + p.skip + ')');
+        hostAdvanceTurn_(true);
+        return;
+      }
+      state.pending = {
+        rolled:false, steps:0, landedTileId:null,
+        canBuy:false, canUpgrade:false,
+        canLoan:canLoan(p), canRepay:canRepay(p)
+      };
+    }
+
+    function hostBuy_(uid){
+      const p = state.players && state.players[uid];
+      if(!p) return;
+      const tile = tileAt(p.pos);
+      if(tile.type!=="PROPERTY" || tile.owner) return;
+      if(p.letters < tile.price) return;
+      tile.owner = p.id;
+      tile.level = 1;
+      p.letters -= tile.price;
+      (p.owned||(p.owned=[])).push(tile.id);
+      hostLog('🏠 매입! ' + tile.name + ' (-' + fmt(tile.price) + '자)');
+    }
+    function hostUpgrade_(uid){
+      const p = state.players && state.players[uid];
+      if(!p) return;
+      const tile = tileAt(p.pos);
+      if(tile.type!=="PROPERTY" || tile.owner!==p.id) return;
+      const uc = upgradeCost(tile);
+      if(uc==null) return;
+      if(p.letters < uc) return;
+      p.letters -= uc;
+      tile.level = (tile.level||1) + 1;
+      hostLog('🛠️ 펜트하우스화! ' + tile.name + ' (-' + fmt(uc) + '자)');
+    }
+    function hostLoan_(uid){
+      const p = state.players && state.players[uid];
+      if(!p) return;
+      if(!canLoan(p)) return;
+      const amount = 1000;
+      p.letters += amount;
+      (p.debts||(p.debts=[])).push({amount, ts: Date.now()});
+      hostLog('🏦 대출 +' + fmt(amount) + '자');
+    }
+    function hostRepay_(uid){
+      const p = state.players && state.players[uid];
+      if(!p) return;
+      if(!canRepay(p)) return;
+      const d = (p.debts||[]).shift();
+      if(!d) return;
+      const payAmt = Math.min(p.letters, d.amount);
+      p.letters -= payAmt;
+      hostLog('🏦 상환 -' + fmt(payAmt) + '자');
+    }
+
+    switch(a.type){
+      case "JOIN": {
+        const name = String(a.payload?.name||"").trim() || "익명";
+        if(!state.players) state.players = {};
+        if(Object.keys(state.players||{}).length >= 5 && !state.players[actorUid]) break;
+
+        if(!state.players[actorUid]) {
+          const np = makePlayerWithId_(name, actorUid);
+          state.players[actorUid] = np;
+          if(!state.hostId) state.hostId = actorUid;
+          hostLog('🧑‍💻 ' + name + ' ' + np.emoji + ' 참여! (시작 ' + fmt(START_LETTERS) + '자)');
+        } else {
+          state.players[actorUid].name = name;
+        }
+
+        if(Object.keys(state.players||{}).length >= 2 && (state.phase==="WAITING" || state.phase==="WAIT" || !state.phase)) {
+          startOrderPhase();
+        }
+        break;
+      }
+      case "ORDER_ROLL": {
+        // If we are still waiting, allow "시작 굴림" to also kick off the order-roll phase.
+        if(state.phase!=="ORDER_ROLL"){
+          const waiting = (state.phase==="WAITING" || state.phase==="WAIT" || !state.phase);
+          const pc = Object.keys(state.players||{}).length;
+          if(waiting && pc>=2) startOrderPhase();
+        }
+        if(state.phase!=="ORDER_ROLL") break;
+        if(!state.players || !state.players[actorUid]) break;
+        const p = state.players[actorUid];
+        if(p.orderRoll != null) break;
+        const n = rollDeterministic_();
+        state.lastRoll = n;
+        p.orderRoll = n;
+        hostLog('🎲 시작 굴림: ' + p.name + ' = ' + n);
+        finalizeOrder();
+        break;
+      }
+      case "ROLL": {
+        if(!state.players || !state.players[actorUid]) break;
+        if(state.phase!=="PLAY") break;
+        if(!isActorsTurn_()) break;
+        if(state.pending?.rolled) break;
+        const p = state.players[actorUid];
+        const n = rollDeterministic_();
+        state.lastRoll = n;
+        state.pending.rolled = true;
+        state.pending.steps = n;
+        hostLog('🎲 ' + p.name + ' 굴림: ' + n);
+
+        moveImmediate_(p, n);
+        const tile = tileAt(p.pos);
+        state.pending.landedTileId = tile.id;
+        if(tile.type === TileType.START) applyStartLand(p);
+        resolveLanding(p, tile);
+        // auto-advance if no property decision (buy/upgrade)
+        const needChoice = !!(state.pending && (state.pending.canBuy || state.pending.canUpgrade));
+        if(!needChoice){
+          hostAdvanceTurn_(true);
+        }
+        break;
+      }
+      case "BUY": {
+        if(!state.players || !state.players[actorUid]) break;
+        if(!isActorsTurn_()) break;
+        hostBuy_(actorUid);
+        // after tile action, auto-advance
+        hostAdvanceTurn_(true);
+        break;
+      }
+      case "UPGRADE": {
+        if(!state.players || !state.players[actorUid]) break;
+        if(!isActorsTurn_()) break;
+        hostUpgrade_(actorUid);
+        hostAdvanceTurn_(true);
+        break;
+      }
+      case "LOAN": {
+        if(!state.players || !state.players[actorUid]) break;
+        if(!isActorsTurn_()) break;
+        hostLoan_(actorUid);
+        // loan is optional; keep turn unless player already rolled and no property decision
+        break;
+      }
+      case "REPAY": {
+        if(!state.players || !state.players[actorUid]) break;
+        if(!isActorsTurn_()) break;
+        hostRepay_(actorUid);
+        break;
+      }
+      case "END": {
+        if(!state.players || !state.players[actorUid]) break;
+        if(!isActorsTurn_()) break;
+        hostAdvanceTurn_(true);
+        break;
+      }
+      case "RESET": {
+        if(actorUid !== state.hostId) break;
+        state = newState(NET.roomId);
+        state._lastActionKey = "";
+        break;
+      }
+    }
+
+    state._lastActionKey = key;
+    return state;
+  });
+}
+  const fmt = (n) => (n ?? 0).toLocaleString('ko-KR');
+  const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+  const rand = (a,b) => Math.floor(Math.random()*(b-a+1))+a;
+  const now = () => new Date().toISOString().slice(11,19);
+  const EMOJIS = ["🐱","🐶","🦊","🐯","🦁","🐼","🐨","🐸","🐵","🦄","🐙","🐧","🐤","🦋","🐝","🐢","🐲","🦖","🦦","🪿","🦝","🐰","🐹","🦕","🦒"];
+
+  const COLORS = ["#ff7cc8","#7cffb2","#ffd166","#7cc8ff","#c77dff","#ff6b6b","#a6ff4d","#ff9f1c","#00d1b2"];
+  let colorCursor = 0;
+  const nextColor = () => COLORS[(colorCursor++) % COLORS.length];
+
+
+  function beepCute(type="click"){
+    try{
+      const ctx = beepCute.ctx || (beepCute.ctx = new (window.AudioContext||window.webkitAudioContext)());
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      const t = ctx.currentTime;
+      const seq = type==="dice" ? [880, 660, 990, 740] : [880, 740];
+      o.type = "triangle";
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.18, t+0.01);
+      let tt = t+0.01;
+      for(const f of seq){
+        o.frequency.setValueAtTime(f, tt);
+        tt += 0.05;
+      }
+      g.gain.exponentialRampToValueAtTime(0.0001, tt+0.08);
+      o.start(t);
+      o.stop(tt+0.10);
+    }catch(e){ /* ignore */ }
+  }
+
+  function toast(msg){
+    const t = $("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toast._tm);
+    toast._tm = setTimeout(()=>t.classList.remove("show"), 2200);
+  }
+
+  function showModal({title="알림", body="", actions=[]} = {}){
+    $("modalTitle").textContent = title;
+    $("modalBody").innerHTML = body;
+    const act = $("modalActions");
+    act.innerHTML = "";
+    actions.forEach(a=>{
+      const b = document.createElement("button");
+      b.className = "btn " + (a.kind||"");
+      b.textContent = a.text;
+      b.onclick = () => { beepCute("click"); try{a.onClick?.()}finally{ if(a.close!==false) hideModal(); } };
+      act.appendChild(b);
+    });
+    $("modalBack").classList.add("show");
+  }
+  function hideModal(){ $("modalBack").classList.remove("show"); }
+
+  $("modalClose").onclick = () => { beepCute("click"); hideModal(); };
+  $("modalBack").addEventListener("click", (e)=>{
+    if(e.target === $("modalBack")) hideModal();
+  });
+
+  /* ===============================
+     Game data
+  =============================== */
+  const ROUNDS_MAX = 10;
+  const START_LETTERS = 15000;
+
+  const TileType = {
+    START: "START",
+    PROPERTY: "PROPERTY",
+    EVENT: "EVENT",
+    REST: "REST"
+  };
+
+  const PropertyTier = [
+    {name:"월세방",  price: 450,  toll: 170},
+    {name:"원룸",   price: 650,  toll: 220},
+    {name:"오피스텔", price: 850,  toll: 280},
+    {name:"투룸",   price: 1050, toll: 340},
+    {name:"아파트",  price: 1300, toll: 420},
+    {name:"고급아파트", price: 1650, toll: 520},
+  ];
+
+  const Upgrade = [
+    {lvl:1, label:"월세",   costMul: 0.0, tollMul: 1.0},
+    {lvl:2, label:"자가",   costMul: 0.55, tollMul: 1.8},
+    {lvl:3, label:"펜트하우스", costMul: 0.80, tollMul: 2.6},
+  ];
+
+  // 24 tiles around border. ids are 0..23
+  const BOARD_DEF = [
+    {id:0,  type:TileType.START, name:"START", desc:"지나가면 +800자, 도착하면 +500자"},
+
+    // ── 아래 순서는 '7x7 외곽 1줄'에 맞춘 진행 순서(시계방향) ──
+    // bottom (7)
+    {id:1,  type:TileType.PROPERTY, tier:0, name:"반지하 월세"},
+    {id:2,  type:TileType.EVENT,    key:"CAFE",   name:"카페 ☕", desc:"집중? 수다? 랜덤!"},
+    {id:3,  type:TileType.PROPERTY, tier:1, name:"대학가 원룸"},
+    {id:4,  type:TileType.EVENT,    key:"TAX",    name:"관리비 🧾", desc:"-300~700자"},
+    {id:5,  type:TileType.PROPERTY, tier:2, name:"역세권 오피스텔"},
+    {id:6,  type:TileType.EVENT,    key:"INSP",   name:"영감 💡", desc:"+글자수 보너스!"},
+
+    // left (6)
+    {id:7,  type:TileType.REST,     key:"SLUMP",  name:"슬럼프 😵", desc:"다음 턴 쉬기 (1회)"},
+    {id:8,  type:TileType.PROPERTY, tier:3, name:"작업실 투룸"},
+    {id:9,  type:TileType.EVENT,    key:"LIB",    name:"도서관 📚", desc:"꾸준히 써짐 +800자"},
+    {id:10, type:TileType.PROPERTY, tier:0, name:"골목 월세"},
+    {id:11, type:TileType.PROPERTY, tier:4, name:"신축 아파트"},
+    {id:12, type:TileType.EVENT,    key:"EDITOR", name:"편집부 호출 📨", desc:"수정요청 -600자, 다음 START 보너스!"},
+
+    // top (6)
+    {id:13, type:TileType.PROPERTY, tier:5, name:"강변뷰 고급아파트"},
+    {id:14, type:TileType.EVENT,    key:"BANK",   name:"은행 🏦", desc:"대출/상환 타이밍 체크"},
+    {id:15, type:TileType.EVENT,    key:"COLLAB", name:"콜라보 🤝", desc:"다른 플레이어와 함께 +500자"},
+    {id:16, type:TileType.PROPERTY, tier:2, name:"초고층 오피스텔"},
+    {id:17, type:TileType.EVENT,    key:"DEADLINE", name:"마감 ⏳", desc:"자산에 따라 보너스/벌금"},
+    {id:18, type:TileType.PROPERTY, tier:4, name:"도심 아파트"},
+
+    // right (5)
+    {id:19, type:TileType.REST,     key:"MOVE",   name:"이사 🚚", desc:"랜덤 이동(앞으로 1~3칸)"},
+    {id:20, type:TileType.PROPERTY, tier:3, name:"복층 투룸"},
+    {id:21, type:TileType.EVENT,    key:"BONUS",  name:"보너스 🎁", desc:"+500~1200자 랜덤"},
+    {id:22, type:TileType.PROPERTY, tier:1, name:"신촌 원룸"},
+    {id:23, type:TileType.PROPERTY, tier:5, name:"스카이라인 고급아파트"},
+  ];
+
+  function makeTileState(def){
+    const st = {
+      id: def.id,
+      type: def.type,
+      name: def.name,
+      desc: def.desc || "",
+      key: def.key || null,
+      tier: def.tier ?? null,
+      owner: null,      // playerId
+      level: 0,         // 0=unowned, 1=월세, 2=자가, 3=펜트하우스
+      price: 0,
+      baseToll: 0,
+    };
+    if(def.type === TileType.PROPERTY){
+      const tier = PropertyTier[clamp(def.tier ?? 0, 0, PropertyTier.length-1)];
+      st.price = tier.price;
+      st.baseToll = tier.toll;
+    }
+    return st;
+  }
+
+  /* ===============================
+     State
+  =============================== */
+  let state = null;
+
+  function newState(roomId){
+    const tiles = BOARD_DEF.map(makeTileState);
+    return {
+      roomId,
+      phase: "WAITING",   // WAITING, ORDER_ROLL, PLAY, GAME_OVER
+      hostId: null,
+      createdAt: Date.now(),
+      round: 0,           // 0..ROUNDS_MAX
+      turnIndex: 0,
+      order: [],          // playerIds
+      players: {},        // id -> player
+      lastRoll: null,
+      pending: null,      // pending action info for current player
+      log: [],
+      tiles,
+    };
+  }
+
+  // Ensure partially-loaded / older room states don't crash the UI or host logic.
+  function normalizeState_(s, roomIdFallback){
+    if(!s || typeof s !== "object") return null;
+    if(!s.roomId) s.roomId = roomIdFallback || s.roomId || "";
+    if(!s.phase) s.phase = "WAITING";
+    if(typeof s.turnIndex !== "number") s.turnIndex = 0;
+    if(!Array.isArray(s.order)) s.order = [];
+    if(!s.players || typeof s.players !== "object") s.players = {};
+    if(!Array.isArray(s.log)) s.log = [];
+    if(!Array.isArray(s.tiles) || !s.tiles.length){
+      try{ s.tiles = BOARD_DEF.map(makeTileState); }catch(e){ s.tiles = s.tiles || []; }
+    }
+
+    // --- player defaults (backward compatibility / partial blobs) ---
+    for(const [pid, p0] of Object.entries(s.players||{})){
+      const p = (p0 && typeof p0 === "object") ? p0 : (s.players[pid] = {});
+      if(!p.id) p.id = pid;
+      if(typeof p.name !== "string" || !p.name.trim()) p.name = "익명";
+      if(!p.emoji) p.emoji = "🙂";
+      if(!p.color) p.color = "#888";
+      if(typeof p.letters !== "number") p.letters = START_LETTERS;
+      if(typeof p.pos !== "number") p.pos = 0;
+      if(typeof p.loansUsed !== "number") p.loansUsed = 0;
+      if(!Array.isArray(p.debts)) p.debts = [];
+      if(typeof p.skip !== "number") p.skip = 0;
+      if(p.orderRoll === undefined) p.orderRoll = null;
+      if(typeof p.bonusStart !== "number") p.bonusStart = 0;
+      if(typeof p.bankrupt !== "boolean") p.bankrupt = false;
+      if(!Array.isArray(p.owned)) p.owned = [];
+    }
+
+    // pending defaults
+    if(!s.pending || typeof s.pending !== "object"){
+      s.pending = { rolled:false, steps:0, landedTileId:null, canBuy:false, canUpgrade:false, canLoan:false, canRepay:false };
+    }else{
+      if(typeof s.pending.rolled !== "boolean") s.pending.rolled = false;
+      if(typeof s.pending.steps !== "number") s.pending.steps = 0;
+      if(s.pending.landedTileId === undefined) s.pending.landedTileId = null;
+    }
+
+    return s;
+  }
+
+
+
+  function makePlayer(name){
+    const id = "p_" + Math.random().toString(36).slice(2,9);
+    const emoji = EMOJIS[rand(0, EMOJIS.length-1)];
+    const color = nextColor();
+    return {
+      id,
+      name,
+      emoji,
+      color,
+      letters: START_LETTERS,
+      pos: 0,
+      loansUsed: 0,
+      debts: [],       // numbers [3300, 3450] etc
+      skip: 0,         // skip turns (slump)
+      orderRoll: null,
+      bonusStart: 0,   // bonus on next START pass (editor effect)
+      bankrupt: false,
+      owned: [],
+    };
+  }
+
+  function alivePlayers(){
+    return Object.values(state.players||{}).filter(p=>!p.bankrupt);
+  }
+  function currentPid(){
+    const order = Array.isArray(state.order) ? state.order : [];
+    if(!order.length) return null;
+    const idx = (typeof state.turnIndex === "number") ? state.turnIndex : 0;
+    return order[idx] || null;
+  }
+  function currentPlayer(){
+    const pid = currentPid();
+    return pid ? state.players[pid] : null;
+  }
+  function isMyTurn(){
+    return local.meId && local.meId === currentPid();
+  }
+
+  /* ===============================
+     Local runtime (Hotseat / Solo)
+  =============================== */
+  const local = {
+    mode: "LOCAL",    // LOCAL only in this MVP
+    meId: null,
+    role: "PLAYER",   // PLAYER | SPECTATOR
+  };
+
+  function setState(next){
+    state = next;
+    renderAll();
+  }
+
+  function pushLog(msg){
+    (state.log||(state.log=[])).unshift(`[${new Date().toLocaleTimeString('ko-KR')}] ${msg}`);
+    if(state.log.length > 80) state.log.length = 80;
+    renderLog();
+  }
+
+  /* ===============================
+     Game logic helpers
+  =============================== */
+  function setPhase(ph){
+    state.phase = ph;
+    $("phaseView").textContent = ph;
+    renderControls();
+  }
+
+  function startOrderPhase(){
+    setPhase("ORDER_ROLL");
+    state.round = 0;
+    state.turnIndex = 0;
+    state.order = Object.keys(state.players||{});
+    for(const p of Object.values(state.players||{})){
+      p.orderRoll = null;
+    }
+    pushLog("🟣 순서 정하기! 모두 '시작 굴림'을 눌러요.");
+    setBanner("💖 모두 <b>시작 굴림</b>을 눌러 순서를 정해요. 큰 수부터 1등!");
+    renderAll();
+  }
+
+  function finalizeOrder(){
+    const ps = Object.values(state.players||{});
+    const rolled = ps.filter(p=>p.orderRoll!=null);
+    if(rolled.length !== ps.length){
+      toast("아직 다 안 굴렸어요!");
+      return;
+    }
+    const map = new Map();
+    for(const p of ps){
+      map.set(p.orderRoll, (map.get(p.orderRoll)||[]).concat([p]));
+    }
+    const tied = [...map.entries()].filter(([k,v])=>v.length>1).sort((a,b)=>b[0]-a[0]);
+    if(tied.length){
+      const tieNames = tied.map(([r,arr]) => `${r}(${arr.map(x=>x.name).join(", ")})`).join(" / ");
+      pushLog(`🟡 동점 발생 → 재굴림 대상: ${tieNames}`);
+      setBanner(`🟡 동점! <b>동점자만</b> 다시 시작 굴림을 눌러요: ${tieNames}`);
+      tied.forEach(([r,arr]) => arr.forEach(p => p.orderRoll = null));
+      renderAll();
+      return;
+    }
+    const order = ps.slice().sort((a,b)=>b.orderRoll - a.orderRoll).map(p=>p.id);
+    state.order = order;
+    state.turnIndex = 0;
+    state.round = 1;
+    setPhase("PLAY");
+    pushLog(`🏁 순서 확정! ${order.map((id,i)=>`${i+1}️⃣ ${state.players[id].name}`).join(" → ")}`);
+    setBanner(`🏁 게임 시작! <b>${state.players[order[0]].name}</b> 님부터 🎲`);
+    for(const p of Object.values(state.players||{})){
+      p.pos = 0; p.letters = START_LETTERS; p.loansUsed = 0; p.debts = [];
+      p.skip = 0; p.bonusStart = 0; p.bankrupt = false; p.owned = [];
+    }
+    for(const t of state.tiles){
+      if(t.type === TileType.PROPERTY){
+        t.owner = null; t.level = 0;
+      }
+    }
+    state.pending = null;
+    renderAll();
+    onTurnStart();
+  }
+
+  function setBanner(html){
+    $("banner").innerHTML = `<span class="nowrap">${html}</span>`;
+  }
+
+  function diceRoll(){ return rand(1,6); }
+
+  function animateDice(finalN, cb){
+    const d = $("dice");
+    d.classList.add("rolling");
+    d.classList.add("pop");
+    let ticks = 0;
+    const faces = ["⚀","⚁","⚂","⚃","⚄","⚅"];
+    const interval = setInterval(()=>{
+      d.textContent = faces[rand(0,5)];
+      ticks++;
+      if(ticks>=14){
+        clearInterval(interval);
+        d.classList.remove("rolling");
+        d.textContent = faces[Math.max(0, Math.min(5, (finalN||1)-1))];
+        // micro-pop finish
+        d.classList.add("finish");
+        setTimeout(()=>d.classList.remove("finish"), 220);
+        cb?.();
+      }
+    }, 45);
+    setTimeout(()=>d.classList.remove("pop"), 260);
+  }
+
+  async function moveSteps(pid, steps){
+    for(let i=0;i<steps;i++){
+      await new Promise(res=>setTimeout(res, 240));
+      const p = state.players[pid];
+      p.pos = (p.pos + 1) % state.tiles.length;
+      if(p.pos === 0) applyStartPass(p);
+      renderBoardTokens();
+    }
+  }
+
+  function applyStartPass(p){
+    let add = 800;
+    if(p.bonusStart > 0){
+      add += p.bonusStart;
+      pushLog(`✨ ${p.name} 편집부 버프 +${fmt(p.bonusStart)}자 추가!`);
+      p.bonusStart = 0;
+    }
+    p.letters += add;
+    pushLog(`🏡 ${p.name} START 통과! +${fmt(add)}자`);
+  }
+  function applyStartLand(p){
+    p.letters += 500;
+    pushLog(`🏡 ${p.name} START 도착! +500자`);
+  }
+
+  function tileAt(pos){ return state.tiles[pos]; }
+
+  function calcToll(tile){
+    if(tile.type !== TileType.PROPERTY || !tile.owner || tile.level <= 0) return 0;
+    const base = tile.baseToll;
+    const mul = Upgrade[clamp(tile.level-1, 0, 2)].tollMul;
+    return Math.round(base * mul);
+  }
+
+  function upgradeCost(tile){
+    if(tile.type !== TileType.PROPERTY || tile.owner==null) return null;
+    if(tile.level >= 3) return null;
+    const nextLevel = tile.level + 1;
+    const mul = Upgrade[clamp(nextLevel-1, 0, 2)].costMul;
+    return Math.round(tile.price * mul);
+  }
+
+  function currentTileInfoHTML(tile){
+    if(!tile) return "";
+    if(tile.type === TileType.START){
+      return `<div><b>🏡 ${tile.name}</b></div><div class="sep"></div><div class="hint">지나가면 <b>+800자</b>, 도착하면 <b>+500자</b></div>`;
+    }
+    if(tile.type === TileType.REST){
+      return `<div><b>🌀 ${tile.name}</b></div><div class="sep"></div><div class="hint">${tile.desc||""}</div>`;
+    }
+    if(tile.type === TileType.EVENT){
+      return `<div><b>✏️ ${tile.name}</b></div><div class="sep"></div><div class="hint">${tile.desc||""}</div>`;
+    }
+    const owner = tile.owner ? state.players[tile.owner] : null;
+    const lvl = tile.level || 0;
+    const lvlLabel = lvl===0 ? "미매입" : Upgrade[lvl-1].label;
+    const toll = calcToll(tile);
+    const upCost = upgradeCost(tile);
+    return `
+      <div><b>🏠 ${tile.name}</b> <span class="tag">${lvlLabel}</span></div>
+      <div class="sep"></div>
+      <div class="hint">
+        매입가: <b>${fmt(tile.price)}자</b><br/>
+        통행료: <b>${fmt(toll)}자</b><br/>
+        소유자: <b>${owner ? owner.name+" "+owner.emoji : "—"}</b><br/>
+        ${upCost!=null ? `다음 업글(펜트하우스화): <b>${fmt(upCost)}자</b>` : `업글: <b>${lvl>=3 ? "최대치" : "—"}</b>`}
+      </div>
+    `;
+  }
+
+  function pay(fromP, toP, amount, reason){
+    amount = Math.max(0, Math.round(amount));
+    if(amount<=0) return;
+    fromP.letters -= amount;
+    if(toP) toP.letters += amount;
+    pushLog(`💸 ${fromP.name} → ${toP?toP.name:"은행"} : ${fmt(amount)}자 (${reason})`);
+    checkBankruptcy(fromP);
+  }
+
+  function checkBankruptcy(p){
+    if(p.bankrupt) return;
+    if(p.letters >= 0) return;
+    p.bankrupt = true;
+    p.letters = 0;
+    for(const t of state.tiles){
+      if(t.type === TileType.PROPERTY && t.owner === p.id){
+        t.owner = null; t.level = 0;
+      }
+    }
+    p.owned = [];
+    pushLog(`💀 ${p.name} 파산! (소유 칸 은행 회수)`);
+    setBanner(`💀 <b>${p.name}</b> 파산! 살아남는 자가 MVP…`);
+    const alive = alivePlayers();
+    if(alive.length === 1){
+      endGame(alive[0].id, "마지막 생존");
+    }
+  }
+
+  function endGame(winnerId, reason){
+    setPhase("GAME_OVER");
+    const w = state.players[winnerId];
+    pushLog(`🏆 게임 종료! 승자: ${w.name} ${w.emoji} (${reason})`);
+    setBanner(`🏆 <b>${w.name}</b> ${w.emoji} 우승! <span class="mono">(${reason})</span>`);
+    showModal({
+      title:"🏆 게임 종료!",
+      body:`<div style="font-size:16px; font-weight:900">승자: ${w.emoji} ${w.name}</div>
+            <div class="hint">사유: <b>${reason}</b></div>
+            <div class="sep"></div>
+            <div class="hint">최종 글자수: <b>${fmt(w.letters)}자</b></div>`,
+      actions:[{text:"확인", kind:"primary", onClick:()=>{}}]
+    });
+    renderControls();
+  }
+
+  function canLoan(p){ return (!p.bankrupt) && p.loansUsed < 2 && p.letters <= 2000; }
+  function canRepay(p){ return p.debts.length > 0 && p.letters >= p.debts[0]; }
+
+  function onTurnStart(){
+    if(state.phase !== "PLAY") return;
+    const pid = currentPid();
+    const p = state.players[pid];
+    if(!p || p.bankrupt){ advanceTurn(true); return; }
+    if(p.skip > 0){
+      p.skip -= 1;
+      pushLog(`😵 ${p.name} 슬럼프… 이번 턴 쉬기 (남은 ${p.skip})`);
+      setBanner(`😵 <b>${p.name}</b> 슬럼프! 이번 턴 스킵…`);
+      advanceTurn(true);
+      return;
+    }
+    state.pending = {
+      rolled:false, steps:0, landedTileId:null,
+      canBuy:false, canUpgrade:false,
+      canLoan:canLoan(p), canRepay:canRepay(p)
+    };
+    setBanner(`🎲 <b>${p.name}</b> 님 차례! 굴려서 월세 탈출 가자…`);
+    renderAll();
+  }
+
+  function advanceTurn(silent=false){
+    if(state.phase !== "PLAY") return;
+    const prevIndex = state.turnIndex;
+    state.turnIndex = (state.turnIndex + 1) % (Array.isArray(state.order)?state.order.length:0);
+    if(prevIndex === (Array.isArray(state.order)?state.order.length:0) - 1){
+      state.round += 1;
+      pushLog(`📌 라운드 종료! 현재 ${state.round} / ${ROUNDS_MAX}`);
+      if(state.round > ROUNDS_MAX){
+        const alive = alivePlayers();
+        if(alive.length === 1){ endGame(alive[0].id, "마지막 생존"); return; }
+        alive.sort((a,b)=>b.letters-a.letters || b.owned.length-a.owned.length);
+        endGame(alive[0].id, "10라운드 글자수 1위");
+        return;
+      }
+    }
+    let guard=0;
+    while(guard<20){
+      const cp = currentPlayer();
+      if(cp && !cp.bankrupt) break;
+      state.turnIndex = (state.turnIndex + 1) % (Array.isArray(state.order)?state.order.length:0);
+      guard++;
+    }
+    if(!silent) setBanner(`👉 다음 차례: <b>${currentPlayer().name}</b>`);
+    onTurnStart();
+  }
+
+  async function handleRollDice(isOrderRoll=false){
+    const p = isOrderRoll ? state.players[local.meId] : currentPlayer();
+    if(!p) return;
+    if(isOrderRoll){
+      if(state.phase !== "ORDER_ROLL") return;
+      if(p.orderRoll != null){ toast("이미 굴렸어요!"); return; }
+    }else{
+      if(state.phase !== "PLAY") return;
+      if(!isMyTurn()){ toast("내 차례가 아니에요!"); return; }
+      if(state.pending?.rolled){ toast("이미 굴렸어요!"); return; }
+    }
+
+    beepCute("dice");
+    const n = diceRoll();
+    state.lastRoll = n;
+    $("lastRoll").textContent = n;
+    animateDice(n, ()=>{});
+
+    if(isOrderRoll){
+      p.orderRoll = n;
+      pushLog(`🎲 시작 굴림: ${p.name} = ${n}`);
+      renderAll();
+      setTimeout(()=>finalizeOrder(), 150);
+      return;
+    }
+
+    state.pending.rolled = true;
+    state.pending.steps = n;
+    pushLog(`🎲 ${p.name} 굴림: ${n}`);
+    setBanner(`🎲 <b>${p.name}</b> : ${n}칸 이동!`);
+
+    await moveSteps(p.id, n);
+    const tile = tileAt(p.pos);
+    state.pending.landedTileId = tile.id;
+    if(tile.type === TileType.START) applyStartLand(p);
+    resolveLanding(p, tile);
+    renderAll();
+    // 매입/업그레이드 선택지가 없으면 자동으로 다음 차례
+    try{
+      const needChoice = !!(state.pending && (state.pending.canBuy || state.pending.canUpgrade));
+      if(!needChoice){
+        setTimeout(()=>{ try{ advanceTurn(); renderAll(); }catch(e){} }, 220);
+      }
+    }catch(e){}
+  }
+
+  function openCollabPicker(p, amount){
+    const others = alivePlayers().filter(x=>x.id !== p.id);
+    if(!others.length){ p.letters += Math.round(amount/2); return; }
+    const body = `
+      <div class="hint">파트너를 선택하면 <b>둘 다 +${fmt(amount)}자</b>!</div>
+      <div class="sep"></div>
+      <div class="row" style="flex-wrap:wrap">
+        ${others.map(o=>`<button class="btn" data-pick="${o.id}">${o.emoji} ${o.name}</button>`).join("")}
+      </div>`;
+    showModal({title:"🤝 콜라보 파트너 선택", body, actions:[{text:"취소", onClick:()=>{}}]});
+    setTimeout(()=>{
+      document.querySelectorAll('[data-pick]').forEach(btn=>{
+        btn.onclick = () => {
+          beepCute("click");
+          const pid = btn.getAttribute("data-pick");
+          const o = state.players[pid];
+          if(!o || o.bankrupt){ toast("대상이 없어요"); return; }
+          p.letters += amount; o.letters += amount;
+          pushLog(`🤝 콜라보 성공! ${p.name} & ${o.name} 각각 +${fmt(amount)}자`);
+          hideModal(); renderAll();
+        };
+      });
+    }, 0);
+  }
+
+  function applyRest(p, tile){
+    if(tile.key==="SLUMP"){
+      p.skip = Math.max(p.skip, 1);
+      pushLog(`😵 ${p.name} 슬럼프! 다음 턴 쉬기 1회`);
+      setBanner(`😵 슬럼프! 다음 턴 쉬기…`);
+      return;
+    }
+    if(tile.key==="MOVE"){
+      const step = rand(1,3);
+      pushLog(`🚚 이사! 앞으로 ${step}칸 이동!`);
+      setBanner(`🚚 이사! 앞으로 ${step}칸!`);
+      // IMPORTANT: In Firebase(host) mode, do NOT use async animation here.
+      // Async movement inside host transaction can cause repeated re-entry / "빙빙빙" loops.
+      if(local.mode==="FB" && NET.isHost){
+        // immediate movement with START pass handling
+        const n = state.tiles.length;
+        for(let i=0;i<step;i++){
+          p.pos = (p.pos + 1) % n;
+          if(p.pos === 0) applyStartPass(p);
+        }
+        const nt = tileAt(p.pos);
+        state.pending.landedTileId = nt.id;
+        if(nt.type === TileType.START) applyStartLand(p);
+        // prevent accidental nested MOVE loops (just in case)
+        state._restMoveDepth = (state._restMoveDepth||0) + 1;
+        if(state._restMoveDepth < 3) resolveLanding(p, nt);
+        state._restMoveDepth = 0;
+        return;
+      }
+      // Non-host / local mode: keep cute movement animation
+      (async()=>{
+        await moveSteps(p.id, step);
+        const nt = tileAt(p.pos);
+        state.pending.landedTileId = nt.id;
+        if(nt.type === TileType.START) applyStartLand(p);
+        resolveLanding(p, nt);
+        renderAll();
+      })();
+    }
+  }
+
+  function applyEvent(p, tile){
+    const key = tile.key;
+    if(key==="LIB"){ p.letters += 800; pushLog(`📚 도서관 +800자`); setBanner(`📚 도서관 집중! +800자`); return; }
+    if(key==="CAFE"){
+      const r = rand(1,3);
+      if(r===1){ p.letters += 1200; pushLog(`☕ 카페 집중 대박 +1,200자`); setBanner(`☕ 집중 대박! +1,200자`); }
+      else if(r===2){ p.letters -= 400; pushLog(`☕ 수다로 망함 -400자`); setBanner(`☕ 수다로 망함… -400자`); checkBankruptcy(p); }
+      else { pushLog(`☕ 콜라보 찬스!`); setBanner(`☕ 콜라보! 파트너 선택`); openCollabPicker(p, 500); }
+      return;
+    }
+    if(key==="INSP"){ const add=rand(600,1300); p.letters+=add; pushLog(`💡 영감 +${fmt(add)}자`); setBanner(`💡 영감 폭발! +${fmt(add)}자`); return; }
+    if(key==="BONUS"){ const add=rand(500,1200); p.letters+=add; pushLog(`🎁 보너스 +${fmt(add)}자`); setBanner(`🎁 보너스! +${fmt(add)}자`); return; }
+    if(key==="TAX"){ const sub=rand(300,700); p.letters-=sub; pushLog(`🧾 관리비 -${fmt(sub)}자`); setBanner(`🧾 관리비… -${fmt(sub)}자`); checkBankruptcy(p); return; }
+    if(key==="EDITOR"){ p.letters-=600; p.bonusStart=1000; pushLog(`📨 편집부 -600자 / 다음 START +1000자`); setBanner(`📨 수정요청! -600자 / 다음 START +1000자`); checkBankruptcy(p); return; }
+    if(key==="DEADLINE"){
+      let delta=0;
+      if(p.letters<=5000) delta=-800;
+      else if(p.letters<=15000) delta=-300;
+      else delta=+300;
+      p.letters += delta;
+      pushLog(`⏳ 마감 ${delta>=0?"+":"-"}${fmt(Math.abs(delta))}자`);
+      setBanner(`⏳ 마감! ${delta>=0?"+":"-"}${fmt(Math.abs(delta))}자`);
+      checkBankruptcy(p);
+      return;
+    }
+    if(key==="COLLAB"){ pushLog(`🤝 콜라보 칸!`); setBanner(`🤝 콜라보! 파트너 선택`); openCollabPicker(p, 500); return; }
+    if(key==="BANK"){ pushLog(`🏦 은행 방문`); setBanner(`🏦 은행! (대출은 2,000자 이하 + 2회)`); return; }
+  }
+
+  function resolveLanding(p, tile){
+    document.querySelectorAll(".tile").forEach(el=>el.classList.remove("current"));
+    const el = document.querySelector(`.tile[data-id="${tile.id}"]`);
+    if(el) el.classList.add("current");
+
+    $("tilePill").textContent = `TILE ${tile.id}`;
+    $("tileInfo").innerHTML = currentTileInfoHTML(tile);
+
+    state.pending.canBuy = false;
+    state.pending.canUpgrade = false;
+    state.pending.canLoan = canLoan(p);
+    state.pending.canRepay = canRepay(p);
+
+    if(tile.type === TileType.PROPERTY){
+      if(!tile.owner){
+        state.pending.canBuy = (p.letters >= tile.price);
+        setBanner(`🏠 <b>${tile.name}</b> 매입? (매입가 ${fmt(tile.price)}자)`);
+      }else if(tile.owner === p.id){
+        const uc = upgradeCost(tile);
+        state.pending.canUpgrade = (uc!=null && p.letters >= uc);
+        setBanner(`🛠️ 내 집! ${state.pending.canUpgrade ? "펜트하우스화 가능!" : "업그레이드 조건 확인"}`);
+      }else{
+        const ownerP = state.players[tile.owner];
+        const toll = calcToll(tile);
+        pay(p, ownerP, toll, `${tile.name} 통행료`);
+        setBanner(`💸 ${ownerP.name}의 집! 통행료 ${fmt(toll)}자`);
+      }
+    }else if(tile.type === TileType.EVENT){
+      applyEvent(p, tile);
+    }else if(tile.type === TileType.REST){
+      applyRest(p, tile);
+    }
+    renderControls();
+  }
+
+  function actBuy(){
+    if(state.phase!=="PLAY" || !isMyTurn()) return;
+    const p = currentPlayer();
+    const tile = tileAt(p.pos);
+    if(tile.type!=="PROPERTY" || tile.owner) return;
+    if(p.letters < tile.price){ toast("글자수가 부족해요!"); return; }
+    tile.owner = p.id;
+    tile.level = 1;
+    p.letters -= tile.price;
+    p.owned.push(tile.id);
+    pushLog(`🏠 매입! ${tile.name} (-${fmt(tile.price)}자)`);
+    setBanner(`🏠 매입 완료! 내 집 됐다 💖`);
+    renderAll();
+    // 자동 다음 차례
+    setTimeout(()=>{ try{ advanceTurn(); renderAll(); }catch(e){} }, 120);
+  }
+  function actUpgrade(){
+    if(state.phase!=="PLAY" || !isMyTurn()) return;
+    const p = currentPlayer();
+    const tile = tileAt(p.pos);
+    if(tile.type!=="PROPERTY" || tile.owner!==p.id){ toast("내 집이 아니에요!"); return; }
+    const uc = upgradeCost(tile);
+    if(uc==null){ toast("업그레이드 불가"); return; }
+    if(p.letters < uc){ toast("글자수가 부족해요!"); return; }
+    p.letters -= uc;
+    tile.level += 1;
+    pushLog(`🛠️ 업글! ${tile.name} → ${Upgrade[tile.level-1].label} (-${fmt(uc)}자)`);
+    setBanner(`🛠️ ${Upgrade[tile.level-1].label} 달성!`);
+    renderAll();
+  }
+  function actLoan(){
+    if(state.phase!=="PLAY" || !isMyTurn()) return;
+    const p = currentPlayer();
+    if(!canLoan(p)){ toast("대출 조건이 아니에요"); return; }
+    p.loansUsed += 1;
+    const principal = 3000;
+    const debt = p.loansUsed===1 ? 3300 : 3450;
+    p.letters += principal;
+    p.debts.push(debt);
+    pushLog(`🏦 대출! +${fmt(principal)}자 (상환 ${fmt(debt)}자)`);
+    setBanner(`🏦 대출 완료!`);
+    renderAll();
+  }
+  function actRepay(){
+    if(state.phase!=="PLAY" || !isMyTurn()) return;
+    const p = currentPlayer();
+    if(!canRepay(p)){ toast("상환 불가"); return; }
+    const debt = p.debts.shift();
+    p.letters -= debt;
+    pushLog(`✅ 상환! -${fmt(debt)}자`);
+    setBanner(`✅ 상환 완료!`);
+    checkBankruptcy(p);
+    renderAll();
+  }
+  function actEndTurn(){
+    if(state.phase!=="PLAY" || !isMyTurn()) return;
+    if(!state.pending?.rolled){
+      showModal({
+        title:"턴 종료 확인",
+        body:`<div class="hint">아직 주사위를 안 굴렸어요. 그래도 턴 종료할까요?</div>`,
+        actions:[
+          {text:"굴릴래!", kind:"good", onClick:()=>{}, close:true},
+          {text:"그래도 종료", kind:"bad", onClick:()=>{ advanceTurn(); }, close:true},
+        ]
+      });
+      return;
+    }
+    advanceTurn();
+  }
+
+  /* ===============================
+     Render
+  =============================== */
+  function renderControls(){
+    const ph = state.phase;
+    const my = local.meId && state.players[local.meId];
+    const waiting = (!ph || ph==="WAIT" || ph==="WAITING");
+    const pc = Object.keys(state.players||{}).length;
+    const canStartOrder = waiting && pc>=2;
+    // Show "시작 굴림" both during ORDER_ROLL and when waiting with enough players (host can kick it off).
+    $("btnOrderRoll").style.display = (ph==="ORDER_ROLL" || canStartOrder) ? "" : "none";
+    $("btnRoll").style.display = (ph==="PLAY") ? "" : "none";
+    $("btnEnd").style.display = (ph==="PLAY") ? "" : "none";
+
+    const isMy = ph==="PLAY" && isMyTurn();
+    const pend = state.pending || {};
+
+        $("btnOrderRoll").disabled = (ph==="ORDER_ROLL")
+      ? !(my && my.orderRoll==null)
+      : !(canStartOrder && NET && NET.isHost);
+    try{
+      $("btnOrderRoll").textContent = "🎲 시작 굴림";
+      $("btnOrderRoll").title = (ph==="ORDER_ROLL")
+        ? "순서 정하기: 아직 안 굴린 사람만 눌러요"
+        : (canStartOrder ? (NET && NET.isHost ? "호스트가 순서 정하기를 시작해요" : "호스트만 시작할 수 있어요") : "플레이어 2명 이상 필요");
+    }catch(e){}
+    $("btnRoll").disabled = !(isMy && !pend.rolled);
+    $("btnEnd").disabled = !(isMy);
+
+    $("btnBuy").disabled = !(isMy && pend.canBuy);
+    $("btnUpgrade").disabled = !(isMy && pend.canUpgrade);
+    $("btnLoan").disabled = !(isMy && pend.canLoan);
+    $("btnRepay").disabled = !(isMy && pend.canRepay);
+  }
+
+  function renderLog(){
+    $("log").innerHTML = state.log.map(x=>`<div class="line">${escapeHtml(x)}</div>`).join("");
+  }
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m]));
+  }
+
+  function fmtChatTime(ts){
+    try{
+      const d = new Date(ts || Date.now());
+      return d.toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'});
+    }catch(e){ return ""; }
+  }
+
+  function appendChat_(m){
+    const box = $("chatLog");
+    if(!box) return;
+    const name = escapeHtml(String(m.name||"익명").slice(0,14));
+    const role = m.role === "SPECTATOR" ? "관전" : "플레이";
+    const when = fmtChatTime(m.ts);
+    const txt = escapeHtml(String(m.text||"").slice(0,200));
+    if(!txt) return;
+
+    const div = document.createElement("div");
+    div.className = "chatmsg";
+    div.innerHTML = `<div class="m1"><span class="who">${name} <span style="opacity:.7">(${role})</span></span><span class="when">${when}</span></div><div class="txt">${txt}</div>`;
+    box.appendChild(div);
+
+    // keep at most 140 msgs
+    while(box.children.length > 140) box.removeChild(box.firstChild);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  async function sendChat_(){
+    const inp = $("chatInp");
+    if(!inp) return;
+    const text = (inp.value||"").trim();
+    if(!text) return;
+    if(!NET.enabled || !NET.inited || !NET.chatRef){ toast("채팅 연결이 아직이에요!"); return; }
+    const name = ensureName() || (AUTO_NAME || "익명");
+    const role = local.role === "SPECTATOR" ? "SPECTATOR" : "PLAYER";
+    inp.value = "";
+    try{
+      await NET.chatRef.push({
+        uid: NET.uid || null,
+        name,
+        role,
+        text: text.slice(0,200),
+        ts: firebase.database.ServerValue.TIMESTAMP
+      });
+    }catch(e){
+      console.warn(e);
+      toast("채팅 전송 실패…");
+    }
+  }
+
+  function renderSide(){
+    $("aliveCount").textContent = alivePlayers().length;
+    const me = local.meId;
+    if(me && state.players[me]){
+      $("meEmoji").textContent = state.players[me].emoji;
+      $("meLetters").textContent = `${fmt(state.players[me].letters)}자`;
+    }else{
+      $("meEmoji").textContent = "—";
+      $("meLetters").textContent = "—";
+    }
+
+    const ordered = state.order?.length ? state.order.map(id=>state.players[id]).filter(Boolean) : Object.values(state.players||{});
+    $("plist").innerHTML = ordered.map(p=>{
+      const isTurn = (p.id === currentPid());
+      const debts = (p.debts||[]).reduce((a,b)=>a+b, 0);
+      const cls = ["pitem", p.id===me ? "me":"", p.bankrupt?"dead":""]
+        .filter(Boolean).join(" ");
+      return `
+        <div class="${cls}">
+          <div class="pname">
+            <span class="emoji">${p.emoji}</span>
+            <div class="n">${isTurn ? "👉 " : ""}${escapeHtml(p.name)}</div>
+          </div>
+          <div class="pmeta">
+            ${p.bankrupt ? "💀 파산" : `${fmt(p.letters)}자`}<br/>
+            🏠${p.owned.length} / 🏦${p.loansUsed} / 💳${fmt(debts)}
+          </div>
+        </div>`;
+    }).join("");
+  }
+
+
+  function formatTileLabel(t){
+    // 기본: 1줄(이모지) + 2줄(이름) + (선택) 3줄(서브)
+    if(t.type === TileType.START){
+      return { emoji:"🏡", label:"START", sub:"(입주)" };
+    }
+    const raw = (t.name || "").trim();
+
+    // 이름에 포함된 이모지를 첫 줄로 빼기
+    let emoji = null;
+    try{
+      const m = raw.match(/\p{Extended_Pictographic}/u);
+      if(m) emoji = m[0];
+    }catch(e){
+      // 일부 구형 브라우저 fallback
+      const m = raw.match(/[\u{1F300}-\u{1FAFF}]/u);
+      if(m) emoji = m[0];
+    }
+
+    let label = raw;
+    try{
+      label = raw.replace(/\p{Extended_Pictographic}/gu, "").replace(/\s{2,}/g," ").trim();
+    }catch(e){
+      label = raw.replace(/[\u{1F300}-\u{1FAFF}]/gu, "").replace(/\s{2,}/g," ").trim();
+    }
+    if(!label) label = raw;
+
+    // 이름에 이모지가 없으면: 타입/티어 기반 기본 이모지
+    if(!emoji){
+      if(t.type === TileType.PROPERTY){
+        const tier = clamp(t.tier ?? 0, 0, 5);
+        emoji = ["🏚️","🛏️","🏢","🧑‍💻","🏠","🏙️"][tier] || "🏠";
+      }else if(t.type === TileType.EVENT){
+        emoji = "✏️";
+      }else if(t.type === TileType.REST){
+        emoji = "🌀";
+      }else{
+        emoji = "🧩";
+      }
+    }
+
+    return { emoji, label, sub:"" };
+  }
+
+  function renderBoard(){
+    const grid = $("boardGrid");
+    if(!renderBoard._done){
+      for(const t of state.tiles){
+        const div = document.createElement("div");
+        div.className = `tile pos-${t.id}`;
+        div.setAttribute("data-id", t.id);
+        div.innerHTML = `
+          <div class="badge">${t.type==="PROPERTY" ? "🏠" : t.type==="EVENT" ? "✏️" : t.type==="REST" ? "🌀" : "🏡"}</div>
+          <div class="name"></div>
+          <div class="sub"></div>
+          <div class="tokens"></div>
+          <div class="ownerBar"></div>`;
+        div.onclick = () => {
+          beepCute("click");
+          const tile = state.tiles[t.id];
+          $("tilePill").textContent = `TILE ${tile.id}`;
+          $("tileInfo").innerHTML = currentTileInfoHTML(tile);
+          toast(tile.name);
+        };
+        grid.appendChild(div);
+      }
+      renderBoard._done = true;
+    }
+
+    for(const t of state.tiles){
+      const div = document.querySelector(`.tile[data-id="${t.id}"]`);
+      if(!div) continue;
+      const nameEl = div.querySelector(".name");
+      const lab = formatTileLabel(t);
+            const subHtml = lab.sub ? `<div class="tSub">${escapeHtml(lab.sub)}</div>` : "";
+      nameEl.innerHTML = `<div class="tEmoji">${lab.emoji}</div><div class="tLabel">${escapeHtml(lab.label)}</div>` + subHtml;
+      if(t.type === TileType.PROPERTY){
+        const owner = t.owner ? state.players[t.owner] : null;
+
+        // 보드판에는 '이름만' 크게 (세부 정보는 우측 '칸 정보'에서 확인)
+        div.querySelector(".sub").textContent = "";
+
+        // 소유/미매입은 색으로만 표현: 미매입=기본, 매입=플레이어 고유색 스트립 + 배경 틴트
+        const ob = div.querySelector(".ownerBar");
+        if(owner && t.level>0){
+          ob.style.display = "block";
+          ob.style.background = owner.color;
+          div.style.borderColor = owner.color + "66"; // alpha
+          div.style.background =
+            `linear-gradient(180deg, rgba(255,255,255,.06), rgba(0,0,0,.22)),
+             radial-gradient(360px 180px at 30% 18%, ${owner.color}33, transparent 62%),
+             radial-gradient(360px 180px at 70% 80%, ${owner.color}22, transparent 62%)`;
+        }else{
+          ob.style.display = "none";
+          div.style.borderColor = "rgba(255,255,255,.10)";
+          div.style.background = `linear-gradient(180deg, rgba(255,255,255,.05), rgba(0,0,0,.18))`;
+        }
+      } else {
+        div.querySelector(".sub").textContent = "";
+        const ob = div.querySelector(".ownerBar");
+        ob.style.display = "none";
+        div.style.borderColor = "rgba(255,255,255,.10)";
+        div.style.background = `linear-gradient(180deg, rgba(255,255,255,.05), rgba(0,0,0,.18))`;
+      }
+    }
+    renderBoardTokens();
+  }
+
+  function renderBoardTokens(){
+    document.querySelectorAll(".tile .tokens").forEach(x=>x.innerHTML="");
+    const posMap = new Map();
+    for(const p of Object.values(state.players||{})){
+      if(p.bankrupt) continue;
+      const arr = posMap.get(p.pos) || [];
+      arr.push(p);
+      posMap.set(p.pos, arr);
+    }
+    for(const [pos, arr] of posMap.entries()){
+      const holder = document.querySelector(`.tile[data-id="${pos}"] .tokens`);
+      if(!holder) continue;
+      arr.forEach((p, idx)=>{
+        const t = document.createElement("div");
+        t.className = "token";
+        const dx = (idx%3) * 12;
+        const dy = Math.floor(idx/3) * -10;
+        t.style.setProperty("--dx", dx+"px");
+        t.style.setProperty("--dy", dy+"px");
+        t.textContent = p.emoji;
+        holder.appendChild(t);
+      });
+    }
+  }
+
+  function renderAll(){
+    $("roomIdView").textContent = state?.roomId || "—";
+    $("phaseView").textContent = state?.phase || "WAIT";
+    $("pillRoom").style.display = state?.roomId ? "inline-flex" : "none";
+
+    // join panel should stay available for latecomers while the game is still joinable (WAITING / ORDER_ROLL)
+    const joinable = !!state && (state.phase === "WAITING" || state.phase === "ORDER_ROLL");
+    const showJoin = (!state) || (joinable && !local.meId);
+    $("joinPanel").style.display = showJoin ? "" : "none";
+    $("gamePanel").style.display = showJoin ? "none" : "grid";
+
+    $("roundView").textContent = `라운드 ${state.round} / ${ROUNDS_MAX}`;
+    const cp = currentPlayer();
+    $("turnTag").textContent = cp ? `TURN: ${cp.name}` : "—";
+    $("lastRoll").textContent = state.lastRoll ?? "—";
+
+    renderBoard();
+    renderSide();
+    renderLog();
+    renderControls();
+  }
+
+  /* ===============================
+     UI wiring
+  =============================== */
+  function ensureRoomId(){
+    // 수다방에서 넘어온 sid를 방 코드로 고정
+    const rid = (AUTO_ROOM_ID || "SUDABANG").trim();
+    return rid ? rid.toUpperCase() : "SUDABANG";
+  }
+  function ensureName(){
+
+    const name = ($("inpName").value || "").trim();
+    return name ? name.slice(0,14) : null;
+  }
+
+  if($("btnNewRoom")) $("btnNewRoom").onclick = () => { toast("이 버전은 수다방 자동방만 사용해요 🙂"); };
+
+  $("btnJoin").onclick = async () => {
+  beepCute("click");
+  local.role = "PLAYER";
+  const rid = ensureRoomId();
+  const name = ensureName();
+  if(!name || name==="익명"){ toast("닉네임을 입력해줘! (익명 말고!)"); return; }
+  try{ localStorage.setItem("bb_last_name", name); }catch(e){}
+
+  await netInit_(rid);
+  if(!NET.enabled){ toast("멀티 연결 실패…"); return; }
+
+  $("joinPanel").style.display = "none";
+  $("gamePanel").style.display = "grid";
+  $("roomIdView").textContent = rid;
+  $("chatRoomView").textContent = rid;
+
+  emitAction_("JOIN", {name});
+  setBanner(`🔗 멀티 연결 완료! (roomId=${rid})`);
+};
+
+$("btnSpectate").onclick = async () => {
+  beepCute("click");
+  local.role = "SPECTATOR";
+  const rid = ensureRoomId();
+  await netInit_(rid);
+  if(!NET.enabled){ toast("멀티 연결 실패…"); return; }
+
+  // 관전은 플레이어로 JOIN하지 않음 (채팅은 가능)
+  local.meId = null;
+
+  $("joinPanel").style.display = "none";
+  $("gamePanel").style.display = "grid";
+  $("roomIdView").textContent = rid;
+  $("chatRoomView").textContent = rid;
+
+  setBanner(`👀 관전 모드! (roomId=${rid})`);
+};
+
+// chat UI
+if($("chatSend")) $("chatSend").onclick = () => { beepCute("click"); sendChat_(); };
+if($("chatInp")) $("chatInp").addEventListener("keydown", (e)=>{ if(e.key==="Enter"){ e.preventDefault(); sendChat_(); } });
+
+// auto connect to the same room immediately (so spectators can chat too)
+(async () => {
+  const rid = ensureRoomId();
+  try{
+    $("roomIdView").textContent = rid;
+    $("chatRoomView").textContent = rid;
+  }catch(e){}
+  await netInit_(rid);
+
+  // 자동 참여(오토조인) 비활성화: 닉네임 입력을 반드시 거치도록 함
+})();
+
+  if($("btnLocalStart")) $("btnLocalStart").onclick = () => { toast("로컬 모드는 제거되었어요 🙂"); };
+
+  // Multiplayer: everyone emits actions, host applies and broadcasts state
+$("btnOrderRoll").onclick = () => {
+  beepCute("dice");
+  if(local.mode==="FB") return emitAction_("ORDER_ROLL", {});
+  return handleRollDice(true);
+};
+$("btnRoll").onclick = () => {
+  beepCute("dice");
+  if(local.mode==="FB") return emitAction_("ROLL", {});
+  return handleRollDice(false);
+};
+$("btnBuy").onclick = () => { beepCute("click"); if(local.mode==="FB") return emitAction_("BUY", {}); actBuy(); };
+$("btnUpgrade").onclick = () => { beepCute("click"); if(local.mode==="FB") return emitAction_("UPGRADE", {}); actUpgrade(); };
+$("btnLoan").onclick = () => { beepCute("click"); if(local.mode==="FB") return emitAction_("LOAN", {}); actLoan(); };
+$("btnRepay").onclick = () => { beepCute("click"); if(local.mode==="FB") return emitAction_("REPAY", {}); actRepay(); };
+$("btnEnd").onclick = () => { beepCute("click"); if(local.mode==="FB") return emitAction_("END", {}); actEndTurn(); };
+
+  // Hotseat: current player controls
+  const _renderAll = renderAll;
+  renderAll = function(){
+    if(local.mode==="LOCAL" && state.phase==="PLAY"){
+      local.meId = currentPid();
+    }
+    _renderAll();
+  };
+
+  $("btnHelp").onclick = () => {
+    beepCute("click");
+    showModal({
+      title:"📜 규칙 (10라운드 / 펜트하우스화)",
+      body:`
+        <div class="hint">
+          ✅ 인원: <b>2~5명</b><br/>
+          ✅ 시작 자산: <b>${fmt(START_LETTERS)}자</b><br/>
+          ✅ 순서: 모두 <b>시작 굴림</b> → 큰 수부터 (동점은 동점자 재굴림)<br/>
+          ✅ 라운드: <b>${ROUNDS_MAX}</b> 라운드 종료까지 생존하면 <b>글자수 1위</b> 승리<br/>
+          ✅ 파산이 발생하면: 파산하지 않고 <b>마지막 생존</b>이 MVP 승리<br/><br/>
+          🏠 부동산:
+          <ul style="margin:6px 0 0 18px">
+            <li>비어있으면 매입 가능 (매입하면 <b>월세</b> 상태)</li>
+            <li>내 집이면 <b>펜트하우스화</b>(업글) 가능 (월세→자가→펜트하우스)</li>
+            <li>남의 집 밟으면 <b>통행료</b>를 글자수로 지급</li>
+          </ul>
+          🏦 대출:
+          <ul style="margin:6px 0 0 18px">
+            <li>글자수 <b>2,000자 이하</b> + <b>최대 2회</b></li>
+            <li>대출 +3,000자 / 상환 1회차 3,300자, 2회차 3,450자</li>
+          </ul>
+        </div>`,
+      actions:[{text:"확인", kind:"primary", onClick:()=>{}}]
+    });
+  };
+
+  $("btnReset").onclick = () => {
+    beepCute("click");
+    showModal({
+      title:"리셋",
+      body:`<div class="hint">정말 리셋할까요? 현재 진행이 사라져요.</div>`,
+      actions:[
+        {text:"취소", onClick:()=>{}},
+        {text:"리셋", kind:"bad", onClick:()=>{
+          if(local.mode==="FB"){ emitAction_("RESET", {}); toast("리셋 요청!"); return; }
+          state = null;
+          local.meId = null;
+          renderBoard._done = false;
+          document.querySelectorAll("#boardGrid .tile").forEach(x=>x.remove());
+          if($("inpRoom")) $("inpRoom").value = "";
+          $("inpName").value = "";
+          $("roomIdView").textContent = "—";
+          $("phaseView").textContent = "WAIT";
+          $("joinPanel").style.display = "";
+          $("gamePanel").style.display = "none";
+          toast("리셋 완료");
+          setState(newState("—"));
+        }}
+      ]
+    });
+  };
+
+  // bootstrap
+  setState(newState("—"));
+  renderAll();
+
+
+  // ---- join UI 강제 보장: 내 uid가 아직 players에 없으면 joinPanel을 유지 ----
+  try{
+    const saved = (localStorage.getItem("bb_last_name")||"").trim();
+    if($("inpName") && !($("inpName").value||"").trim() && saved && saved!=="익명"){
+      $("inpName").value = saved;
+    }
+    if($("joinPanel")) $("joinPanel").style.display = "block";
+    if($("gamePanel")) $("gamePanel").style.display = "none";
+  }catch(e){}
+})();</script>
+</body>
+</html>
