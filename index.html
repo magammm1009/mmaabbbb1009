@@ -2622,7 +2622,7 @@ function renderBoardTokens(){
     const base = (AUTO_ROOM_ID || "SUDABANG").trim() || "SUDABANG";
     // ✅ gs(게임세션)가 있으면 방 키에 포함해서 '항상 새 판'을 보장
     const gs = (GAME_SESSION||"").trim();
-    const rid = base; // ✅ 모두 같은 sid 방으로 동기화 (gs는 표시용/캐시우회용으로만 사용)
+        const rid = gs ? (base + "__" + gs) : base; // ✅ gs 포함: 항상 새 게임 세션
     return rid.toUpperCase();
   }
   function ensureName(){
